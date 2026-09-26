@@ -49,7 +49,11 @@ export class SlimeRenderer {
     isBoosting: boolean = false,
     moveAngle: number = 0,
     isCorroding: boolean = false,
-    corrosionSeverity: number = 1.0
+    corrosionSeverity: number = 1.0,
+    // Offset applied to belly particles, whose positions come from the latest logic step while the
+    // body is drawn at an interpolated position (see SlimeOrganism.render).
+    particleShiftX: number = 0,
+    particleShiftY: number = 0
   ): void {
     this.graphics.clear();
     if (nodes.length < 3) return;
@@ -163,7 +167,7 @@ export class SlimeRenderer {
     // 6. Circulating Belly Particles
     for (const bp of organelles.bellyParticles) {
       this.graphics.fillStyle(bp.color, (bp.life / bp.maxLife) * 0.8 * alpha);
-      this.graphics.fillCircle(bp.x, bp.y, bp.size);
+      this.graphics.fillCircle(bp.x + particleShiftX, bp.y + particleShiftY, bp.size);
     }
 
     // 7. Internal Glowing Organelles

@@ -67,6 +67,16 @@ export class SlimeOrganism {
   private scene: Phaser.Scene;
   private audio: BioAudioBridge;
 
+  // Interpolation state: logic runs in fixed steps, render() blends the previous and current step.
+  private prevX: number = 0;
+  private prevY: number = 0;
+  private prevRadius: number = 0;
+  private prevNodePos: Float32Array = new Float32Array(0);
+  private renderNodes: SlimeNode[] = [];
+  /** Interpolated core position from the last render() (for camera follow). */
+  public renderX: number = 0;
+  public renderY: number = 0;
+
   constructor(
     scene: Phaser.Scene,
     x: number,
@@ -95,6 +105,23 @@ export class SlimeOrganism {
     this.organelles = new OrganelleManager(radius);
 
     this.initNodes();
+    this.snapshotPrevState();
+    this.renderX = x;
+    this.renderY = y;
+  }
+
+  /** Records the current logic state as the interpolation origin for the next step. */
+  private snapshotPrevState(): void {
+    this.prevX = this.x;
+    this.prevY = this.y;
+    this.prevRadius = this.radius;
+    const n = this.nodes.length;
+    if (this.prevNodePos.length !== n * 2) this.prevNodePos = new Float32Array(n * 2);
+    const prev = this.prevNodePos;
+    for (let i = 0; i < n; i++) {
+      prev[i * 2] = this.nodes[i].x;
+      prev[i * 2 + 1] = this.nodes[i].y;
+    }
   }
 
   private initNodes(): void {
@@ -169,13 +196,19 @@ export class SlimeOrganism {
     return daughter;
   }
 
-  public update(
+  /**
+   * Advances the organism by one fixed logic step (1/60 s). Does not draw; call render() once per
+   * rendered frame.
+   */
+  public step(
     targetX: number,
     targetY: number,
     worldWidth: number,
     worldHeight: number,
     moveInput?: { x: number; y: number }
   ): void {
+    this.snapshotPrevState();
+
     // Cooldown decrements
     if (this.lungeTimer > 0) {
       this.lungeTimer--;
@@ -355,25 +388,65 @@ export class SlimeOrganism {
 
     // Internal biological updates
     this.organelles.update(this.x, this.y, destX, destY, this.radius);
+  }
 
-    // Render to graphics (with boost stinger spike & corrosion bubbles)
+  /**
+   * Draws the organism blended between the previous and current logic step.
+   * @param alpha 0 = previous step state, 1 = current step state.
+   */
+  public render(alpha: number = 1): void {
+    let nodes = this.nodes;
+    let rx = this.x;
+    let ry = this.y;
+    let rr = this.radius;
+
+    if (alpha < 1) {
+      const t = alpha;
+      rx = this.prevX + (this.x - this.prevX) * t;
+      ry = this.prevY + (this.y - this.prevY) * t;
+      rr = this.prevRadius + (this.radius - this.prevRadius) * t;
+
+      const prev = this.prevNodePos;
+      const out = this.renderNodes;
+      for (let i = 0; i < this.nodes.length; i++) {
+        const node = this.nodes[i];
+        let o = out[i];
+        if (!o) {
+          o = { ...node };
+          out[i] = o;
+        } else {
+          o.targetAngle = node.targetAngle;
+        }
+        o.x = prev[i * 2] + (node.x - prev[i * 2]) * t;
+        o.y = prev[i * 2 + 1] + (node.y - prev[i * 2 + 1]) * t;
+      }
+      out.length = this.nodes.length;
+      nodes = out;
+    }
+
+    this.renderX = rx;
+    this.renderY = ry;
+
+    // Boost stinger spike & corrosion bubbles
     const corrosionSeverity = this.isCorroding
       ? SlimeOrganism.lerpClamp(this.corrosionPointRadius, TRAIL_RADIUS_MIN_REF, TRAIL_RADIUS_MAX_REF, 0, 1) * this.corrosionPoisonIntensity
       : 0;
     this.renderer.render(
-      this.nodes,
-      this.x,
-      this.y,
-      this.radius,
+      nodes,
+      rx,
+      ry,
+      rr,
       this.theme,
       this.organelles,
       this.isFrozen,
       this.upgrades.viscousAcidCoat,
       this.isControlled ? 1.0 : 0.82,
       (this.isBoosting || this.isLunging),
-      moveAngle,
+      this.lastMoveAngle,
       this.isCorroding,
-      corrosionSeverity
+      corrosionSeverity,
+      rx - this.x,
+      ry - this.y
     );
   }
 

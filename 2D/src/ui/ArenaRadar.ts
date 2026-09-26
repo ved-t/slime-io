@@ -7,7 +7,8 @@ export class ArenaRadar {
   private cx: number = 1280 - 85;
   private cy: number = 720 - 85;
   private radarRadius: number = 65;
-  private frameCounter: number = 0;
+  private lastDrawMs: number = -Infinity;
+  private static readonly REDRAW_INTERVAL_MS = 50;
 
   private arenaCenterX: number;
   private arenaCenterY: number;
@@ -30,8 +31,10 @@ export class ArenaRadar {
   }
 
   public render(player: SlimeOrganism, slimes: SlimeOrganism[], pellets: Pellet[]): void {
-    // ~20 Hz is plenty for a minimap
-    if (this.frameCounter++ % 3 !== 0) return;
+    // ~20 Hz is plenty for a minimap (time-based so it doesn't scale with refresh rate)
+    const nowMs = performance.now();
+    if (nowMs - this.lastDrawMs < ArenaRadar.REDRAW_INTERVAL_MS) return;
+    this.lastDrawMs = nowMs;
     this.graphics.clear();
 
     const scale = this.radarRadius / this.arenaRadius;
@@ -77,7 +80,7 @@ export class ArenaRadar {
     const px = this.cx + (player.x - this.arenaCenterX) * scale;
     const py = this.cy + (player.y - this.arenaCenterY) * scale;
 
-    const now = performance.now() * 0.005;
+    const now = nowMs * 0.005;
     const pingR = 3.5 + Math.sin(now) * 2;
     this.graphics.lineStyle(1.5, 0x34d399, 0.6);
     this.graphics.strokeCircle(px, py, pingR);

@@ -88,7 +88,7 @@ export class AISlimeBot {
     const destY = this.slime.y + Math.sin(this.currentAngle) * leadDist;
 
     // Update physical slime
-    this.slime.update(destX, destY, arenaRadius * 2, arenaRadius * 2);
+    this.slime.step(destX, destY, arenaRadius * 2, arenaRadius * 2);
   }
 
   private evaluateSensors(

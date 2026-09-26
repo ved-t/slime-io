@@ -31,8 +31,9 @@ export class WaveDirector {
     }
   }
 
+  /** One fixed logic step. `simTimeMs` is the simulation clock, `delta` the step duration (ms). */
   public update(
-    time: number,
+    simTimeMs: number,
     delta: number,
     slimePositions: { x: number; y: number }[],
     magnetActive: boolean
@@ -44,7 +45,7 @@ export class WaveDirector {
         spore.destroy();
         this.spores.splice(i, 1);
       } else {
-        spore.update(time, slimePositions, magnetActive);
+        spore.update(simTimeMs, slimePositions, magnetActive);
       }
     }
 
@@ -55,7 +56,7 @@ export class WaveDirector {
         critter.destroy();
         this.critters.splice(i, 1);
       } else {
-        critter.update(time, slimePositions, this.level.worldWidth, this.level.worldHeight);
+        critter.update(slimePositions, this.level.worldWidth, this.level.worldHeight);
       }
     }
 
@@ -66,7 +67,7 @@ export class WaveDirector {
         core.destroy();
         this.cores.splice(i, 1);
       } else {
-        core.update(time, this.level.worldWidth, this.level.worldHeight);
+        core.update(simTimeMs, this.level.worldWidth, this.level.worldHeight);
       }
     }
 
@@ -81,6 +82,19 @@ export class WaveDirector {
         else if (rand < 0.9) this.spawnCritter();
         else this.spawnCore();
       }
+    }
+  }
+
+  /** Draws all live prey once per rendered frame, interpolated by `alpha`. */
+  public render(alpha: number, timeMs: number): void {
+    for (const spore of this.spores) {
+      if (!spore.isDevoured) spore.render(alpha, timeMs);
+    }
+    for (const critter of this.critters) {
+      if (!critter.isDevoured) critter.render(alpha, timeMs);
+    }
+    for (const core of this.cores) {
+      if (!core.isDevoured) core.render(alpha, timeMs);
     }
   }
 

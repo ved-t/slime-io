@@ -9,6 +9,7 @@ import { AISlimeDirector } from '../systems/ai/AISlimeDirector';
 import { ArenaLeaderboardHUD } from '../ui/ArenaLeaderboardHUD';
 import { ArenaRadar } from '../ui/ArenaRadar';
 import { BioAudioBridge } from '../audio/BioAudioBridge';
+import { FixedTimestep, perStepToFrameFactor } from '../core/FixedTimestep';
 
 interface ArenaSceneData {
   themeKey?: string;
@@ -63,6 +64,13 @@ export class ArenaScene extends Phaser.Scene {
   // never inherit the world camera's slither-style zoom (see update()).
   private uiRoot!: Phaser.GameObjects.Container;
   private perfText!: Phaser.GameObjects.Text;
+  private perfFrames: number = 0;
+  private perfSteps: number = 0;
+
+  // Logic runs at a fixed 60 steps/s; rendering happens once per browser frame (see update()).
+  private stepper = new FixedTimestep();
+  // Camera follows this proxy (the player's interpolated position), not the raw logic position.
+  private readonly cameraTarget = { x: 0, y: 0 };
 
   constructor() {
     super({ key: 'ArenaScene' });
@@ -74,6 +82,7 @@ export class ArenaScene extends Phaser.Scene {
     this.playerName = data.playerName || 'SPECIMEN-01';
     this.upgrades = data.upgrades || { ...INITIAL_UPGRADES };
     this.playerDead = false;
+    this.stepper = new FixedTimestep();
   }
 
   public create(): void {
@@ -137,7 +146,9 @@ export class ArenaScene extends Phaser.Scene {
       this.ARENA_RADIUS
     );
 
-    // Perf overlay (toggle with ` key): FPS, frame time and entity counts, refreshed at 2 Hz
+    // Perf overlay (toggle with ` key): render FPS, sim steps/s, frame time and entity counts, refreshed at 2 Hz.
+    // Note: game.loop.actualFps counts every requestAnimationFrame tick (a lagging average of the
+    // display refresh rate), so render/sim rates are measured here directly instead.
     this.perfText = this.add.text(12, 12, '', {
       fontFamily: 'monospace',
       fontSize: '12px',
@@ -150,10 +161,14 @@ export class ArenaScene extends Phaser.Scene {
       delay: 500,
       loop: true,
       callback: () => {
+        const renderFps = this.perfFrames * 2;
+        const simRate = this.perfSteps * 2;
+        this.perfFrames = 0;
+        this.perfSteps = 0;
         if (!this.perfText.visible) return;
         const loop = this.game.loop;
         this.perfText.setText(
-          `FPS ${loop.actualFps.toFixed(0)}  frame ${loop.delta.toFixed(1)}ms\n` +
+          `render ${renderFps} fps  sim ${simRate} steps/s  frame ${loop.rawDelta.toFixed(1)}ms  rAF ${loop.actualFps.toFixed(0)}\n` +
           `slimes ${this.aiDirector.bots.length + (this.playerDead ? 0 : 1)}  ` +
           `pellets ${this.biomassManager.pellets.length}  trail pts ${this.toxicTrails.trailPoints.length}`
         );
@@ -209,7 +224,9 @@ export class ArenaScene extends Phaser.Scene {
       this.playerName
     );
     this.player.isControlled = true;
-    this.cameras.main.startFollow(this.player, true, 0.08, 0.08);
+    this.cameraTarget.x = px;
+    this.cameraTarget.y = py;
+    this.cameras.main.startFollow(this.cameraTarget, true, 0.08, 0.08);
 
     // Connect boost pellet drop
     this.player.onDropBoostPellet = (x, y, col) => {
@@ -272,6 +289,15 @@ export class ArenaScene extends Phaser.Scene {
   public update(): void {
     if (this.isPaused) return;
 
+    // Fixed timestep: run 0..N logic steps covering the real elapsed time, then draw once.
+    const frameMs = this.game.loop.rawDelta;
+    this.perfSteps += this.stepper.advance(frameMs, () => this.fixedStep());
+    this.renderFrame(this.stepper.alpha, frameMs);
+    this.perfFrames++;
+  }
+
+  /** One logic step (1/60 s). All per-step tuning constants assume this cadence. */
+  private fixedStep(): void {
     if (this.playerDead) {
       this.toxicTrails.update();
       const allSlimes = this.gatherSlimes(false);
@@ -317,25 +343,13 @@ export class ArenaScene extends Phaser.Scene {
     this.player.isBoosting = isBoosting && (this.player.radius > 28);
 
     // Update Player Slime
-    this.player.update(
+    this.player.step(
       targetX,
       targetY,
       this.WORLD_SIZE,
       this.WORLD_SIZE,
       undefined
     );
-
-    // Slither-style Zoom scaling with mass (follow is set once in spawnPlayer)
-    const targetZoom = Math.max(0.48, 1.05 - (this.player.radius - 45) * 0.0035);
-    const currentZoom = this.cameras.main.zoom;
-    this.cameras.main.setZoom(currentZoom + (targetZoom - currentZoom) * 0.05);
-
-    // Counter the camera's zoom/scroll on the UI root so HUD/radar/modals stay
-    // pixel-fixed on screen regardless of how zoomed in/out the world camera is.
-    const zoom = this.cameras.main.zoom;
-    this.uiRoot.setScale(1 / zoom);
-    const uiOrigin = this.cameras.main.getWorldPoint(0, 0, this.uiOrigin);
-    this.uiRoot.setPosition(uiOrigin.x, uiOrigin.y);
 
     // 2. Gather All Active Slimes
     const allSlimes = this.gatherSlimes(true);
@@ -364,10 +378,46 @@ export class ArenaScene extends Phaser.Scene {
     // 6. Check Combat & Boundary Collisions
     this.resolveArenaCombat(allSlimes);
 
-    // 7. Update HUD & Radar
+    // 7. Update HUD (its timers/refresh throttle are step-counted)
     if (!this.playerDead) {
       this.hud.update(this.player, allSlimes);
-      this.radar.render(this.player, allSlimes, this.biomassManager.pellets);
+    }
+  }
+
+  /**
+   * Draws everything once per browser frame, interpolated between the last two logic steps.
+   * @param alpha 0 = previous step state, 1 = current step state.
+   * @param frameMs real duration of this frame, for time-correct camera easing.
+   */
+  private renderFrame(alpha: number, frameMs: number): void {
+    const cam = this.cameras.main;
+
+    if (!this.playerDead) {
+      this.player.render(alpha);
+      this.cameraTarget.x = this.player.renderX;
+      this.cameraTarget.y = this.player.renderY;
+
+      // Slither-style Zoom scaling with mass (follow is set once in spawnPlayer).
+      // Easing factors were tuned per 60 FPS frame; convert them to this frame's duration.
+      const targetZoom = Math.max(0.48, 1.05 - (this.player.radius - 45) * 0.0035);
+      const zoomK = perStepToFrameFactor(0.05, frameMs);
+      cam.setZoom(cam.zoom + (targetZoom - cam.zoom) * zoomK);
+    }
+    const followK = perStepToFrameFactor(0.08, frameMs);
+    cam.setLerp(followK, followK);
+
+    // Counter the camera's zoom/scroll on the UI root so HUD/radar/modals stay
+    // pixel-fixed on screen regardless of how zoomed in/out the world camera is.
+    this.uiRoot.setScale(1 / cam.zoom);
+    const uiOrigin = cam.getWorldPoint(0, 0, this.uiOrigin);
+    this.uiRoot.setPosition(uiOrigin.x, uiOrigin.y);
+
+    this.aiDirector.render(alpha);
+    this.biomassManager.render(alpha);
+    this.toxicTrails.render();
+
+    if (!this.playerDead) {
+      this.radar.render(this.player, this.allSlimes, this.biomassManager.pellets);
     }
   }
 

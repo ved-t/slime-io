@@ -3,6 +3,7 @@ import { ThemeColors, THEMES } from '../config/Themes';
 import { SlimeOrganism } from '../entities/slime/SlimeOrganism';
 import { INITIAL_UPGRADES } from '../config/GameConfig';
 import { BioAudioBridge } from '../audio/BioAudioBridge';
+import { FixedTimestep } from '../core/FixedTimestep';
 
 export interface PreyItem {
   id: number;
@@ -13,6 +14,9 @@ export interface PreyItem {
   radius: number;
   x: number;
   y: number;
+  // Position at the start of the last logic step, for render interpolation
+  px: number;
+  py: number;
   vx: number;
   vy: number;
   angle: number;
@@ -31,6 +35,8 @@ export interface TrailPuddle {
 export interface IngestionParticle {
   x: number;
   y: number;
+  px: number;
+  py: number;
   vx: number;
   vy: number;
   size: number;
@@ -86,6 +92,9 @@ export class MenuBioSimulation {
   private particles: IngestionParticle[] = [];
   private shockwaves: IngestionShockwave[] = [];
 
+  // Logic runs at a fixed 60 steps/s; rendering happens once per browser frame (see update()).
+  private stepper = new FixedTimestep();
+
   constructor(scene: Phaser.Scene, width: number, height: number, initialThemeKey: string = 'acid') {
     this.scene = scene;
     this.width = width;
@@ -119,6 +128,9 @@ export class MenuBioSimulation {
 
     // 3. Seed prey ecosystem
     this.seedEcosystem();
+
+    // 4. The lab backdrop is static, so draw it once instead of every frame
+    this.renderBackground();
   }
 
   public setTheme(themeKey: string): void {
@@ -165,6 +177,8 @@ export class MenuBioSimulation {
       radius: template.radius,
       x: x,
       y: y,
+      px: x,
+      py: y,
       vx: (Math.random() - 0.5) * speed,
       vy: (Math.random() - 0.5) * speed,
       angle: Math.random() * Math.PI * 2,
@@ -202,14 +216,24 @@ export class MenuBioSimulation {
   // ==========================================
   // SIMULATION UPDATE LOOP
   // ==========================================
-  public update(time: number, delta: number): void {
+  /**
+   * Called once per browser frame: runs 0..N fixed logic steps for the real elapsed time
+   * (`frameMs`, use `game.loop.rawDelta`), then draws once, interpolated.
+   */
+  public update(time: number, frameMs: number): void {
+    this.stepper.advance(frameMs, (simTimeMs) => this.step(simTimeMs));
+    this.render(this.stepper.alpha, time);
+  }
+
+  /** One logic step (1/60 s). `simTimeMs` is the simulation clock. */
+  private step(simTimeMs: number): void {
     // 1. Maintain target nutrient density
     if (this.preyItems.length < this.targetPreyCount) {
       this.spawnPrey();
     }
 
     // 2. Update Prey Ecosystem
-    this.updatePreyEcosystem(time);
+    this.updatePreyEcosystem(simTimeMs);
 
     // 3. Autonomous Predatory AI & Slime Steering (Casual pacing)
     this.updateSlimeAI();
@@ -219,17 +243,16 @@ export class MenuBioSimulation {
 
     // 5. Visual Effects & Slime Floor Residue Trails
     this.updateEffects();
-
-    // 6. Render Environment, Prey, Tendril, & FX Layers
-    this.render(time);
   }
 
-  private updatePreyEcosystem(time: number): void {
-    const t = time * 0.003;
+  private updatePreyEcosystem(simTimeMs: number): void {
+    const t = simTimeMs * 0.003;
     const margin = 45;
 
     for (let i = this.preyItems.length - 1; i >= 0; i--) {
       const item = this.preyItems[i];
+      item.px = item.x;
+      item.py = item.y;
 
       if (item.type === 'critter') {
         item.fleeing = false;
@@ -336,7 +359,7 @@ export class MenuBioSimulation {
     }
 
     // Advance the authentic SlimeOrganism physics, membrane, organelles, and alien eyes!
-    this.slime.update(destX, destY, this.width, this.height);
+    this.slime.step(destX, destY, this.width, this.height);
 
     // Metabolic size homeostasis: smoothly keeps specimen around ~55-62px radius
     if (this.slime.targetRadius > 62) {
@@ -366,6 +389,8 @@ export class MenuBioSimulation {
           this.particles.push({
             x: food.x,
             y: food.y,
+            px: food.x,
+            py: food.y,
             vx: Math.cos(angle) * spd,
             vy: Math.sin(angle) * spd,
             size: 2.5 + Math.random() * 3.5,
@@ -414,6 +439,8 @@ export class MenuBioSimulation {
     // Splash particles
     for (let i = this.particles.length - 1; i >= 0; i--) {
       const p = this.particles[i];
+      p.px = p.x;
+      p.py = p.y;
       p.x += p.vx;
       p.y += p.vy;
       p.vx *= 0.93;
@@ -438,11 +465,12 @@ export class MenuBioSimulation {
   // ==========================================
   // RENDERING PIPELINE
   // ==========================================
-  private render(time: number): void {
-    this.renderBackground();
+  /** Draws once per browser frame; moving things are interpolated by `alpha`. */
+  private render(alpha: number, time: number): void {
+    this.slime.render(alpha);
     this.renderTrails();
-    this.renderPrey(time);
-    this.renderFX();
+    this.renderPrey(time, alpha);
+    this.renderFX(alpha);
   }
 
   private renderBackground(): void {
@@ -502,38 +530,44 @@ export class MenuBioSimulation {
     }
   }
 
-  private renderPrey(time: number): void {
+  private renderPrey(time: number, alpha: number): void {
     this.preyGraphics.clear();
     const t = time * 0.003;
 
     // 1. Draw dynamic pseudopod reach tendril towards targeted prey
     if (this.targetPrey) {
       const p = this.targetPrey;
-      const dist = Math.hypot(p.x - this.slime.x, p.y - this.slime.y);
+      const sx = this.slime.renderX;
+      const sy = this.slime.renderY;
+      const ptx = p.px + (p.x - p.px) * alpha;
+      const pty = p.py + (p.y - p.py) * alpha;
+      const dist = Math.hypot(ptx - sx, pty - sy);
       if (dist < this.slime.radius * 2.5 && dist > this.slime.radius * 0.6) {
-        const midCtrlX = (this.slime.x + p.x) * 0.5 + Math.sin(t * 3.5) * 16;
-        const midCtrlY = (this.slime.y + p.y) * 0.5 + Math.cos(t * 3.5) * 16;
+        const midCtrlX = (sx + ptx) * 0.5 + Math.sin(t * 3.5) * 16;
+        const midCtrlY = (sy + pty) * 0.5 + Math.cos(t * 3.5) * 16;
 
         this.preyGraphics.lineStyle(2.5, this.theme.primary, 0.55);
         this.preyGraphics.beginPath();
-        this.preyGraphics.moveTo(this.slime.x, this.slime.y);
+        this.preyGraphics.moveTo(sx, sy);
         this.preyGraphics.lineTo(midCtrlX, midCtrlY);
-        this.preyGraphics.lineTo(p.x, p.y);
+        this.preyGraphics.lineTo(ptx, pty);
         this.preyGraphics.strokePath();
       }
     }
 
     // 2. Draw all nutrient ecosystem items
     for (const item of this.preyItems) {
+      const ix = item.px + (item.x - item.px) * alpha;
+      const iy = item.py + (item.y - item.py) * alpha;
       const pulse = 1 + Math.sin(t * 2 + item.pulseOffset) * 0.15;
       const r = item.radius * pulse;
 
       if (item.type === 'spore') {
         // Glowing organic pulsating spore
         this.preyGraphics.fillStyle(item.color, 0.9);
-        this.preyGraphics.fillCircle(item.x, item.y, r);
+        this.preyGraphics.fillCircle(ix, iy, r);
         this.preyGraphics.fillStyle(0xffffff, 0.95);
-        this.preyGraphics.fillCircle(item.x, item.y, r * 0.42);
+        this.preyGraphics.fillCircle(ix, iy, r * 0.42);
       } else if (item.type === 'crystal') {
         // Iridescent angular nutrient diamond crystal
         const rot = t + item.pulseOffset;
@@ -551,8 +585,8 @@ export class MenuBioSimulation {
         this.preyGraphics.lineStyle(1.2, 0xffffff, 0.8);
         this.preyGraphics.beginPath();
         for (let j = 0; j < pts.length; j++) {
-          const px = item.x + pts[j].x * cosR - pts[j].y * sinR;
-          const py = item.y + pts[j].x * sinR + pts[j].y * cosR;
+          const px = ix + pts[j].x * cosR - pts[j].y * sinR;
+          const py = iy + pts[j].x * sinR + pts[j].y * cosR;
           if (j === 0) this.preyGraphics.moveTo(px, py);
           else this.preyGraphics.lineTo(px, py);
         }
@@ -586,8 +620,8 @@ export class MenuBioSimulation {
           const invP = 1 - p;
           const lx = invP * invP * p0x + 2 * invP * p * p1x + p * p * p2x;
           const ly = invP * invP * p0y + 2 * invP * p * p1y + p * p * p2y;
-          const gx = item.x + cosA * lx - sinA * ly;
-          const gy = item.y + sinA * lx + cosA * ly;
+          const gx = ix + cosA * lx - sinA * ly;
+          const gy = iy + sinA * lx + cosA * ly;
           if (s === 0) this.preyGraphics.moveTo(gx, gy);
           else this.preyGraphics.lineTo(gx, gy);
         }
@@ -601,8 +635,8 @@ export class MenuBioSimulation {
           const invP = 1 - p;
           const lx = invP * invP * p0x + 2 * invP * p * p1x + p * p * p2x;
           const ly = invP * invP * p0y + 2 * invP * p * p1y + p * p * p2y;
-          const gx = item.x + cosA * lx - sinA * ly;
-          const gy = item.y + sinA * lx + cosA * ly;
+          const gx = ix + cosA * lx - sinA * ly;
+          const gy = iy + sinA * lx + cosA * ly;
           if (s === 0) this.preyGraphics.moveTo(gx, gy);
           else this.preyGraphics.lineTo(gx, gy);
         }
@@ -620,8 +654,8 @@ export class MenuBioSimulation {
           const th = (s / bodySteps) * Math.PI * 2;
           const lx = Math.cos(th) * (rx + 1);
           const ly = Math.sin(th) * (ry + 1);
-          const gx = item.x + cosA * lx - sinA * ly;
-          const gy = item.y + sinA * lx + cosA * ly;
+          const gx = ix + cosA * lx - sinA * ly;
+          const gy = iy + sinA * lx + cosA * ly;
           if (s === 0) this.preyGraphics.moveTo(gx, gy);
           else this.preyGraphics.lineTo(gx, gy);
         }
@@ -635,8 +669,8 @@ export class MenuBioSimulation {
           const th = (s / bodySteps) * Math.PI * 2;
           const lx = Math.cos(th) * rx;
           const ly = Math.sin(th) * ry;
-          const gx = item.x + cosA * lx - sinA * ly;
-          const gy = item.y + sinA * lx + cosA * ly;
+          const gx = ix + cosA * lx - sinA * ly;
+          const gy = iy + sinA * lx + cosA * ly;
           if (s === 0) this.preyGraphics.moveTo(gx, gy);
           else this.preyGraphics.lineTo(gx, gy);
         }
@@ -650,8 +684,8 @@ export class MenuBioSimulation {
           const th = (s / bodySteps) * Math.PI * 2;
           const lx = Math.cos(th) * (rx * 0.65);
           const ly = Math.sin(th) * (ry * 0.35);
-          const gx = item.x + cosA * lx - sinA * ly;
-          const gy = item.y + sinA * lx + cosA * ly;
+          const gx = ix + cosA * lx - sinA * ly;
+          const gy = iy + sinA * lx + cosA * ly;
           if (s === 0) this.preyGraphics.moveTo(gx, gy);
           else this.preyGraphics.lineTo(gx, gy);
         }
@@ -663,16 +697,16 @@ export class MenuBioSimulation {
         const eyeLateral = 3.0;
 
         // Eye 1 (Left)
-        const e1x = item.x + cosA * eyeForward - sinA * (-eyeLateral);
-        const e1y = item.y + sinA * eyeForward + cosA * (-eyeLateral);
+        const e1x = ix + cosA * eyeForward - sinA * (-eyeLateral);
+        const e1y = iy + sinA * eyeForward + cosA * (-eyeLateral);
         this.preyGraphics.fillStyle(0xffffff, 1.0);
         this.preyGraphics.fillCircle(e1x, e1y, 2.0);
         this.preyGraphics.fillStyle(0x0f172a, 1.0);
         this.preyGraphics.fillCircle(e1x + cosA * 0.5, e1y + sinA * 0.5, 1.0);
 
         // Eye 2 (Right)
-        const e2x = item.x + cosA * eyeForward - sinA * eyeLateral;
-        const e2y = item.y + sinA * eyeForward + cosA * eyeLateral;
+        const e2x = ix + cosA * eyeForward - sinA * eyeLateral;
+        const e2y = iy + sinA * eyeForward + cosA * eyeLateral;
         this.preyGraphics.fillStyle(0xffffff, 1.0);
         this.preyGraphics.fillCircle(e2x, e2y, 2.0);
         this.preyGraphics.fillStyle(0x0f172a, 1.0);
@@ -680,20 +714,20 @@ export class MenuBioSimulation {
       } else if (item.type === 'droplet') {
         // Bio-lipid nutrient droplet
         this.preyGraphics.fillStyle(item.color, 0.85);
-        this.preyGraphics.fillCircle(item.x, item.y, r);
+        this.preyGraphics.fillCircle(ix, iy, r);
         this.preyGraphics.lineStyle(1.2, 0xffffff, 0.4);
-        this.preyGraphics.strokeCircle(item.x, item.y, r);
+        this.preyGraphics.strokeCircle(ix, iy, r);
       } else {
         // Radiating plasma cluster
         this.preyGraphics.fillStyle(item.color, 0.9);
-        this.preyGraphics.fillCircle(item.x, item.y, r);
+        this.preyGraphics.fillCircle(ix, iy, r);
         this.preyGraphics.lineStyle(1.5, 0xffffff, 0.7);
-        this.preyGraphics.strokeCircle(item.x, item.y, r * 1.35);
+        this.preyGraphics.strokeCircle(ix, iy, r * 1.35);
       }
     }
   }
 
-  private renderFX(): void {
+  private renderFX(alpha: number): void {
     this.fxGraphics.clear();
 
     // 1. Shockwaves
@@ -705,7 +739,7 @@ export class MenuBioSimulation {
     // 2. Ingestion splash particles
     for (const p of this.particles) {
       this.fxGraphics.fillStyle(p.color, p.alpha);
-      this.fxGraphics.fillCircle(p.x, p.y, p.size);
+      this.fxGraphics.fillCircle(p.px + (p.x - p.px) * alpha, p.py + (p.y - p.py) * alpha, p.size);
     }
   }
 

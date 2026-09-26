@@ -15,6 +15,7 @@ import { ArcadeHUD } from '../ui/ArcadeHUD';
 import { AlertBanner } from '../ui/AlertBanner';
 import { Minimap } from '../ui/Minimap';
 import { BioAudioBridge } from '../audio/BioAudioBridge';
+import { FixedTimestep, STEP_MS } from '../core/FixedTimestep';
 
 interface SceneData {
   levelNumber: number;
@@ -59,6 +60,11 @@ export class ContainmentLevelScene extends Phaser.Scene {
   private timeRemainingSec: number = 120;
   private levelEnded: boolean = false;
 
+  // Logic runs at a fixed 60 steps/s; rendering happens once per browser frame (see update()).
+  private stepper = new FixedTimestep();
+  // Camera follows this proxy (the controlled slime's interpolated position).
+  private readonly cameraTarget = { x: 0, y: 0 };
+
   constructor() {
     super({ key: 'ContainmentLevelScene' });
   }
@@ -71,6 +77,7 @@ export class ContainmentLevelScene extends Phaser.Scene {
     this.upgrades = data.upgrades || { ...INITIAL_UPGRADES };
     this.timeRemainingSec = this.level.timeLimitSeconds;
     this.levelEnded = false;
+    this.stepper = new FixedTimestep();
     this.slimes = [];
     this.lasers = [];
     this.turrets = [];
@@ -101,6 +108,9 @@ export class ContainmentLevelScene extends Phaser.Scene {
     );
     this.slimes.push(primarySlime);
     this.activeSlimeIndex = 0;
+    this.cameraTarget.x = start.x;
+    this.cameraTarget.y = start.y;
+    this.cameras.main.startFollow(this.cameraTarget, true, 1, 1);
 
     // 4. Security Hazards
     this.lasers = this.level.lasers.map(c => new LaserGate(this, c));
@@ -220,13 +230,10 @@ export class ContainmentLevelScene extends Phaser.Scene {
     this.banner.show("SWITCHED ACTIVE CELL", `Controlling specimen #${this.activeSlimeIndex + 1}`, 1500, 0x38bdf8);
   }
 
-  public update(time: number, delta: number): void {
+  public update(time: number): void {
     if (this.levelEnded) return;
 
-    const deltaSec = delta / 1000;
-    this.timeRemainingSec -= deltaSec;
-
-    // Keyboard Hotkey checks
+    // Keyboard hotkeys are one-shot input events: handle them once per frame, before the logic steps
     if (Phaser.Input.Keyboard.JustDown(this.keyM)) {
       this.triggerMitosis();
     }
@@ -236,6 +243,18 @@ export class ContainmentLevelScene extends Phaser.Scene {
     if (Phaser.Input.Keyboard.JustDown(this.keySpace)) {
       this.triggerLunge();
     }
+
+    // Fixed timestep: run 0..N logic steps covering the real elapsed time, then draw once.
+    this.stepper.advance(this.game.loop.rawDelta, (simTimeMs) => this.fixedStep(simTimeMs));
+    if (this.levelEnded) return;
+    this.renderFrame(this.stepper.alpha, time);
+  }
+
+  /** One logic step (1/60 s). All per-step tuning constants assume this cadence. */
+  private fixedStep(simTimeMs: number): void {
+    if (this.levelEnded) return;
+
+    this.timeRemainingSec -= STEP_MS / 1000;
 
     // Input vector calculation (WASD / Arrows)
     let moveX = 0;
@@ -258,31 +277,24 @@ export class ContainmentLevelScene extends Phaser.Scene {
       slime.isControlled = (i === this.activeSlimeIndex);
 
       if (slime.isControlled) {
-        slime.update(worldPointer.x, worldPointer.y, this.level.worldWidth, this.level.worldHeight, { x: moveX, y: moveY });
+        slime.step(worldPointer.x, worldPointer.y, this.level.worldWidth, this.level.worldHeight, { x: moveX, y: moveY });
       } else {
         // Secondary specimen autonomously hovers near its split point or trails slightly
-        slime.update(slime.x, slime.y, this.level.worldWidth, this.level.worldHeight);
+        slime.step(slime.x, slime.y, this.level.worldWidth, this.level.worldHeight);
       }
 
       totalMass += slime.mass;
     }
 
-    // Camera follow & zoom based on controlled slime growth
-    if (controlledSlime) {
-      this.cameras.main.startFollow(controlledSlime, true, 0.08, 0.08);
-      const targetZoom = Math.max(0.72, 1.0 - (controlledSlime.radius - 50) * 0.002);
-      this.cameras.main.setZoom(targetZoom);
-    }
-
     // Update Lasers
     for (const laser of this.lasers) {
-      laser.update(time);
+      laser.update(simTimeMs);
     }
 
     // Update Turrets
     const slimePositions = this.slimes.map(s => ({ x: s.x, y: s.y, isControlled: s.isControlled }));
     for (const turret of this.turrets) {
-      turret.update(slimePositions, delta);
+      turret.update(slimePositions, STEP_MS);
     }
 
     // Update Drones
@@ -294,7 +306,7 @@ export class ContainmentLevelScene extends Phaser.Scene {
     }
 
     // Update Security Director & Alert Level
-    this.securityDirector.update(detectedThisFrame, delta);
+    this.securityDirector.update(detectedThisFrame, STEP_MS);
 
     // Decontamination gas drain if in RED ALERT (gentle drain to urge player to escape)
     if (this.securityDirector.decontaminationActive) {
@@ -304,7 +316,7 @@ export class ContainmentLevelScene extends Phaser.Scene {
     }
 
     // Update Prey Wave Director
-    this.waveDirector.update(time, delta, slimePositions, this.upgrades.pheromoneMagnet);
+    this.waveDirector.update(simTimeMs, STEP_MS, slimePositions, this.upgrades.pheromoneMagnet);
 
     // Collisions
     this.collisionManager.checkCollisions(
@@ -342,6 +354,38 @@ export class ContainmentLevelScene extends Phaser.Scene {
       return;
     }
 
+    // Update Banner
+    this.banner.update(STEP_MS);
+  }
+
+  /**
+   * Draws everything once per browser frame, interpolated between the last two logic steps.
+   * @param alpha 0 = previous step state, 1 = current step state.
+   * @param timeMs real time, for purely visual animation (pulses, wiggles).
+   */
+  private renderFrame(alpha: number, timeMs: number): void {
+    let totalMass = 0;
+    for (const slime of this.slimes) {
+      slime.render(alpha);
+      totalMass += slime.mass;
+    }
+
+    // Camera follow & zoom based on controlled slime growth. The camera hard-locks (lerp 1) onto the
+    // interpolated position, matching the old behaviour of calling startFollow every frame.
+    const controlledSlime = this.slimes[this.activeSlimeIndex] || this.slimes[0];
+    if (controlledSlime) {
+      this.cameraTarget.x = controlledSlime.renderX;
+      this.cameraTarget.y = controlledSlime.renderY;
+      const targetZoom = Math.max(0.72, 1.0 - (controlledSlime.radius - 50) * 0.002);
+      this.cameras.main.setZoom(targetZoom);
+    }
+
+    for (const laser of this.lasers) laser.render(alpha);
+    for (const turret of this.turrets) turret.render(alpha);
+    for (const drone of this.drones) drone.render(alpha);
+    this.waveDirector.render(alpha, timeMs);
+    this.blastDoor.render();
+
     // Update HUD
     const lungeCooldownPct = controlledSlime ? controlledSlime.lungeCooldown / controlledSlime.maxLungeCooldown : 0;
     const canSplit = controlledSlime ? (controlledSlime.splitCooldown === 0 && controlledSlime.mass >= 2400) : false;
@@ -356,12 +400,9 @@ export class ContainmentLevelScene extends Phaser.Scene {
       canSplit
     );
 
-    // Update Banner
-    this.banner.update(delta);
-
     // Update Minimap
     this.minimap.render(
-      slimePositions,
+      this.slimes,
       this.lasers,
       this.turrets,
       this.drones,

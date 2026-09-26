@@ -64,8 +64,8 @@ export class ToxicTrailManager {
   public trailPoints: TrailPoint[] = [];
   private lastDropPositions: Map<string, { x: number; y: number }> = new Map();
 
-  // Trail duration: ~4.0 seconds at 60 FPS
-  private readonly DEFAULT_LIFETIME = 240;
+  // Trail duration: ~5.5 seconds (60 steps/s fixed timestep, refresh-rate independent)
+  private readonly DEFAULT_LIFETIME = 420;
   // Outer yellow border thickness
   private readonly BORDER_WIDTH = 2.4;
 
@@ -141,6 +141,7 @@ export class ToxicTrailManager {
     }
   }
 
+  /** One fixed logic step (1/60 s): ages, converts and prunes trail points. Drawing is in render(). */
   public update(): void {
     // Age and prune expired trail points
     for (let i = this.trailPoints.length - 1; i >= 0; i--) {
@@ -163,8 +164,6 @@ export class ToxicTrailManager {
         this.trailPoints.splice(i, 1);
       }
     }
-
-    this.render();
   }
 
   /**
@@ -179,7 +178,8 @@ export class ToxicTrailManager {
     return Math.max(0, 1.0 - fadeT);
   }
 
-  private render(): void {
+  /** Draws all trails; call once per rendered frame. Trail points are static, so no interpolation. */
+  public render(): void {
     const renderer = this.renderer;
     renderer.borderGraphics.clear();
     renderer.maskGraphics.clear();

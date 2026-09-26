@@ -10,6 +10,7 @@ export class LaserGate {
   private currentX2: number;
   private currentY2: number;
   private rotAngle: number = 0;
+  private prevRotAngle: number = 0; // rotation at the start of the last logic step (render interpolation)
   private graphics: Phaser.GameObjects.Graphics;
   private audio: BioAudioBridge;
 
@@ -24,59 +25,78 @@ export class LaserGate {
     this.audio = BioAudioBridge.getInstance();
   }
 
-  public update(timeMs: number): void {
+  /** One fixed logic step (1/60 s). `simTimeMs` is the simulation clock driving the on/off cycle. */
+  public update(simTimeMs: number): void {
     const cycleTotal = this.config.activeDuration + this.config.inactiveDuration;
-    const cyclePos = (timeMs + this.config.offsetMs) % cycleTotal;
-    const wasActive = this.isActive;
+    const cyclePos = (simTimeMs + this.config.offsetMs) % cycleTotal;
     this.isActive = cyclePos < this.config.activeDuration;
 
+    this.prevRotAngle = this.rotAngle;
     if (this.config.rotating && this.config.rotSpeed) {
       this.rotAngle += this.config.rotSpeed;
+      const halfLen = this.halfLength();
       const centerX = (this.config.x1 + this.config.x2) * 0.5;
       const centerY = (this.config.y1 + this.config.y2) * 0.5;
-      const halfLen = Math.hypot(this.config.x2 - this.config.x1, this.config.y2 - this.config.y1) * 0.5;
 
       this.currentX1 = centerX + Math.cos(this.rotAngle) * halfLen;
       this.currentY1 = centerY + Math.sin(this.rotAngle) * halfLen;
       this.currentX2 = centerX - Math.cos(this.rotAngle) * halfLen;
       this.currentY2 = centerY - Math.sin(this.rotAngle) * halfLen;
     }
-
-    this.render();
   }
 
-  private render(): void {
+  private halfLength(): number {
+    return Math.hypot(this.config.x2 - this.config.x1, this.config.y2 - this.config.y1) * 0.5;
+  }
+
+  /** Draws once per rendered frame; rotating beams are interpolated by `alpha`. */
+  public render(alpha: number = 1): void {
+    let x1 = this.currentX1;
+    let y1 = this.currentY1;
+    let x2 = this.currentX2;
+    let y2 = this.currentY2;
+    if (this.config.rotating && this.config.rotSpeed) {
+      const rot = this.prevRotAngle + (this.rotAngle - this.prevRotAngle) * alpha;
+      const halfLen = this.halfLength();
+      const centerX = (this.config.x1 + this.config.x2) * 0.5;
+      const centerY = (this.config.y1 + this.config.y2) * 0.5;
+      x1 = centerX + Math.cos(rot) * halfLen;
+      y1 = centerY + Math.sin(rot) * halfLen;
+      x2 = centerX - Math.cos(rot) * halfLen;
+      y2 = centerY - Math.sin(rot) * halfLen;
+    }
+
     this.graphics.clear();
 
     // Emitter posts
     this.graphics.fillStyle(0x334155, 1);
-    this.graphics.fillCircle(this.currentX1, this.currentY1, 9);
-    this.graphics.fillCircle(this.currentX2, this.currentY2, 9);
+    this.graphics.fillCircle(x1, y1, 9);
+    this.graphics.fillCircle(x2, y2, 9);
 
     const postGlow = this.isActive ? 0xef4444 : 0x475569;
     this.graphics.fillStyle(postGlow, 0.9);
-    this.graphics.fillCircle(this.currentX1, this.currentY1, 4.5);
-    this.graphics.fillCircle(this.currentX2, this.currentY2, 4.5);
+    this.graphics.fillCircle(x1, y1, 4.5);
+    this.graphics.fillCircle(x2, y2, 4.5);
 
     if (!this.isActive) {
       // Dormant preview guide line
       this.graphics.lineStyle(1, 0xef4444, 0.12);
-      this.graphics.lineBetween(this.currentX1, this.currentY1, this.currentX2, this.currentY2);
+      this.graphics.lineBetween(x1, y1, x2, y2);
       return;
     }
 
     // Active sizzling laser beam
     // Outer red glow
     this.graphics.lineStyle(9, 0xef4444, 0.35);
-    this.graphics.lineBetween(this.currentX1, this.currentY1, this.currentX2, this.currentY2);
+    this.graphics.lineBetween(x1, y1, x2, y2);
 
     // Mid laser beam
     this.graphics.lineStyle(4, 0xf87171, 0.85);
-    this.graphics.lineBetween(this.currentX1, this.currentY1, this.currentX2, this.currentY2);
+    this.graphics.lineBetween(x1, y1, x2, y2);
 
     // Inner hot white core
     this.graphics.lineStyle(1.8, 0xffffff, 0.95);
-    this.graphics.lineBetween(this.currentX1, this.currentY1, this.currentX2, this.currentY2);
+    this.graphics.lineBetween(x1, y1, x2, y2);
   }
 
   /**

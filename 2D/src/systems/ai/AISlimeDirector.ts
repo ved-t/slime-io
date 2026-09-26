@@ -96,6 +96,13 @@ export class AISlimeDirector {
     }
   }
 
+  /** Draws every bot, interpolated between the last two logic steps. */
+  public render(alpha: number): void {
+    for (const bot of this.bots) {
+      bot.slime.render(alpha);
+    }
+  }
+
   public removeBot(botSlime: SlimeOrganism): void {
     const index = this.bots.findIndex(b => b.slime.id === botSlime.id);
     if (index !== -1) {

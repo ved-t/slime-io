@@ -396,7 +396,7 @@ export class MainMenuScene extends Phaser.Scene {
   public update(time: number, delta: number): void {
     // 1. Advance the Autonomous Simulation
     if (this.simulation) {
-      this.simulation.update(time, delta);
+      this.simulation.update(time, this.game.loop.rawDelta);
 
       // 2. Sync Live Telemetry Values
       const telemetry = this.simulation.getTelemetry();

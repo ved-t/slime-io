@@ -12,6 +12,7 @@ export class BlastDoor {
 
   private graphics: Phaser.GameObjects.Graphics;
   private audio: BioAudioBridge;
+  private lastTotalMass: number = 0;
 
   constructor(scene: Phaser.Scene, config: BlastDoorConfig, padConfigs: PressurePadConfig[]) {
     this.config = config;
@@ -21,7 +22,10 @@ export class BlastDoor {
     this.audio = BioAudioBridge.getInstance();
   }
 
+  /** One fixed logic step (1/60 s). Returns true once a slime passes the open door. */
   public update(slimes: { x: number; y: number; radius: number }[], totalMass: number): boolean {
+    this.lastTotalMass = totalMass;
+
     // 1. Check Pressure Pads
     if (this.config.requiresDualPads && this.pads.length >= 2) {
       for (const pad of this.pads) {
@@ -64,8 +68,6 @@ export class BlastDoor {
       this.openProgress = Math.max(0.0, this.openProgress - 0.05);
     }
 
-    this.render(totalMass);
-
     // Return true if slime center is within doorway and door is fully or mostly open
     if (this.openProgress > 0.75) {
       const halfW = this.config.width * 0.5 + 20;
@@ -83,7 +85,9 @@ export class BlastDoor {
     return false;
   }
 
-  private render(totalMass: number): void {
+  /** Draws once per rendered frame (door leaves and pads are step-animated; no interpolation needed). */
+  public render(): void {
+    const totalMass = this.lastTotalMass;
     this.graphics.clear();
 
     // Render Pressure Pads

@@ -20,7 +20,10 @@ export const DEFAULT_SETTINGS: GameSettings = {
 export const PHYSICS_CONFIG = {
   elasticity: 0.042,
   internalPressure: 1.05,
-  baseSpeed: 3.2,
+  // TEMP-TWEAK(2026-09-26) [round 3]: lowered from 3.2 after the fixed-timestep change made movement
+  // feel faster than before (it now runs the true, uncapped-refresh speed instead of the throttled
+  // ~48-50 steps/s the broken fps.limit produced) — revert to 3.2 if this ends up feeling too slow.
+  baseSpeed: 2.1,
   lungeMultiplier: 3.8,
   friction: 0.88,
   neighborSpringStrength: 0.08,

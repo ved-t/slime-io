@@ -7,6 +7,9 @@ export interface StunDart {
   y: number;
   vx: number;
   vy: number;
+  // Position at the start of the last logic step, for render interpolation
+  px: number;
+  py: number;
   radius: number;
   life: number;
 }
@@ -34,11 +37,9 @@ export class SecurityTurret {
     this.audio = BioAudioBridge.getInstance();
   }
 
+  /** One fixed logic step; `deltaMs` is the step duration. Drawing happens in render(). */
   public update(slimes: { x: number; y: number; isControlled?: boolean }[], deltaMs: number): void {
-    if (this.isCorroded) {
-      this.renderCorroded();
-      return;
-    }
+    if (this.isCorroded) return;
 
     if (this.fireCooldownTimer > 0) {
       this.fireCooldownTimer -= deltaMs;
@@ -85,6 +86,8 @@ export class SecurityTurret {
     // Update projectiles
     for (let i = this.darts.length - 1; i >= 0; i--) {
       const d = this.darts[i];
+      d.px = d.x;
+      d.py = d.y;
       d.x += d.vx;
       d.y += d.vy;
       d.life -= deltaMs;
@@ -92,15 +95,17 @@ export class SecurityTurret {
         this.darts.splice(i, 1);
       }
     }
-
-    this.render();
   }
 
   private fireDart(aimAngle: number): void {
     const speed = 7.5;
+    const x = this.x + Math.cos(aimAngle) * 22;
+    const y = this.y + Math.sin(aimAngle) * 22;
     this.darts.push({
-      x: this.x + Math.cos(aimAngle) * 22,
-      y: this.y + Math.sin(aimAngle) * 22,
+      x,
+      y,
+      px: x,
+      py: y,
       vx: Math.cos(aimAngle) * speed,
       vy: Math.sin(aimAngle) * speed,
       radius: 6,
@@ -115,7 +120,13 @@ export class SecurityTurret {
     this.targetSlime = null;
   }
 
-  private render(): void {
+  /** Draws once per rendered frame; in-flight darts are interpolated by `alpha`. */
+  public render(alpha: number = 1): void {
+    if (this.isCorroded) {
+      this.renderCorroded();
+      return;
+    }
+
     this.graphics.clear();
 
     // 1. Armored Base
@@ -166,10 +177,12 @@ export class SecurityTurret {
 
     // 4. In-flight Cryo Stun Darts
     for (const dart of this.darts) {
+      const dx = dart.px + (dart.x - dart.px) * alpha;
+      const dy = dart.py + (dart.y - dart.py) * alpha;
       this.graphics.fillStyle(0x38bdf8, 0.4);
-      this.graphics.fillCircle(dart.x, dart.y, dart.radius + 3);
+      this.graphics.fillCircle(dx, dy, dart.radius + 3);
       this.graphics.fillStyle(0xe0f2fe, 0.95);
-      this.graphics.fillCircle(dart.x, dart.y, dart.radius);
+      this.graphics.fillCircle(dx, dy, dart.radius);
     }
   }
 

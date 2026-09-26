@@ -34,11 +34,9 @@ const config: Phaser.Types.Core.GameConfig = {
     VictoryScene,
     GameOverScene
   ],
-  // Game logic is frame-based (no delta), so cap at 60 to keep speed/cost identical on high-refresh displays.
-  fps: {
-    target: 60,
-    limit: 60
-  },
+  // No fps limit: game logic runs on a fixed 60 steps/s timestep (see core/FixedTimestep.ts), so speed
+  // is refresh-rate independent, and rendering interpolates every rAF frame for smooth high-Hz motion.
+  // Phaser's limiter would drop leftover time and render at uneven 48/50/60 Hz cadences on 100-144 Hz.
   render: {
     antialias: true,
     pixelArt: false,

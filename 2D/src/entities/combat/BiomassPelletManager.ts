@@ -6,6 +6,9 @@ export interface Pellet {
   y: number;
   vx: number;
   vy: number;
+  // Position at the start of the last logic step, for render interpolation
+  px: number;
+  py: number;
   radius: number;
   value: number; // nutrition value
   color: number;
@@ -82,7 +85,7 @@ export class BiomassPelletManager {
     color: number, isBurstOrb: boolean, maxAge: number
   ): Pellet {
     return {
-      x, y, vx, vy, radius, value, color, isBurstOrb,
+      x, y, vx, vy, px: x, py: y, radius, value, color, isBurstOrb,
       pulsePhase: Math.random() * Math.PI * 2,
       age: 0,
       maxAge,
@@ -138,9 +141,8 @@ export class BiomassPelletManager {
     }
   }
 
+  /** One fixed logic step (1/60 s). Drawing happens separately in render(). */
   public update(slimes: SlimeOrganism[], hasMagnet: boolean = false): void {
-    const now = performance.now() * 0.003;
-
     // Maintain ambient population
     if (this.ambientCount < this.TARGET_AMBIENT_COUNT) {
       this.spawnAmbientPellet();
@@ -151,6 +153,8 @@ export class BiomassPelletManager {
     // 1. Integrate motion + aging, and bucket live pellets into the grid
     this.clearGrid();
     for (const p of this.pellets) {
+      p.px = p.x;
+      p.py = p.y;
       if (p.isBurstOrb || p.vx !== 0 || p.vy !== 0) {
         p.x += p.vx;
         p.y += p.vy;
@@ -210,8 +214,6 @@ export class BiomassPelletManager {
       if (!p.dead) this.pellets[w++] = p;
     }
     this.pellets.length = w;
-
-    this.render(now);
   }
 
   /**
@@ -284,7 +286,12 @@ export class BiomassPelletManager {
     for (const cell of this.cells) cell.length = 0;
   }
 
-  private render(now: number): void {
+  /**
+   * Draws pellets once per rendered frame, interpolated between the last two logic steps.
+   * @param alpha 0 = previous step position, 1 = current step position.
+   */
+  public render(alpha: number = 1): void {
+    const now = performance.now() * 0.003;
     // Only draw pellets inside the camera view (+ margin for halos/bobbing)
     const view = this.scene.cameras.main.worldView;
     const margin = 24;
@@ -296,14 +303,16 @@ export class BiomassPelletManager {
 
     let used = 0;
     for (const p of this.pellets) {
-      if (p.x < left || p.x > right || p.y < top || p.y > bottom) continue;
+      const x = p.px + (p.x - p.px) * alpha;
+      const y = p.py + (p.y - p.py) * alpha;
+      if (x < left || x > right || y < top || y > bottom) continue;
 
       const pulse = Math.sin(now * 3 + p.pulsePhase) * (p.isBurstOrb ? 1.6 : 0.7);
       const r = Math.max(2.5, p.radius + pulse);
       // Gentle floating micro-bobbing
-      const floatY = p.y + Math.sin(now * 2.2 + p.pulsePhase) * 1.5;
+      const floatY = y + Math.sin(now * 2.2 + p.pulsePhase) * 1.5;
       // Fade out over the last FADE_FRAMES of a dropped pellet's life
-      const alpha = p.maxAge > 0 ? Math.min(1, (p.maxAge - p.age) / this.FADE_FRAMES) : 1;
+      const fade = p.maxAge > 0 ? Math.min(1, (p.maxAge - p.age) / this.FADE_FRAMES) : 1;
 
       let img = this.images[used];
       if (!img) {
@@ -312,9 +321,9 @@ export class BiomassPelletManager {
       } else if (img.texture.key !== p.texKey) {
         img.setTexture(p.texKey);
       }
-      img.setPosition(p.x, floatY);
+      img.setPosition(x, floatY);
       img.setScale(r / baseR);
-      img.setAlpha(alpha);
+      img.setAlpha(fade);
       img.setVisible(true);
       used++;
     }

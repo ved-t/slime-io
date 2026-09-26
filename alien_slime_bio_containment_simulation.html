@@ -1,0 +1,1764 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Xenomorphic Slime Bio-Containment Simulation</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800;900&family=Rajdhani:wght@500;600;700&display=swap');
+
+    *, *::before, *::after {
+      user-select: none;
+      -webkit-user-select: none;
+      box-sizing: border-box;
+      touch-action: manipulation;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      background-color: #030712;
+      color: #e2e8f0;
+      font-family: 'Rajdhani', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    /* Core Utility Classes */
+    .relative { position: relative; }
+    .absolute { position: absolute; }
+    .fixed { position: fixed; }
+    .inset-0 { top: 0; right: 0; bottom: 0; left: 0; }
+    .block { display: block; }
+    .hidden { display: none !important; }
+    .flex { display: flex; }
+    .flex-col { flex-direction: column; }
+    .flex-wrap { flex-wrap: wrap; }
+    .grid { display: grid; }
+    .grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .items-center { align-items: center; }
+    .justify-center { justify-content: center; }
+    .justify-between { justify-content: space-between; }
+    .w-full { width: 100%; }
+    .h-full { height: 100%; }
+    .w-10 { width: 2.5rem; }
+    .h-10 { height: 2.5rem; }
+    .w-80 { width: 20rem; }
+    .w-2 { width: 0.5rem; }
+    .h-2 { height: 0.5rem; }
+    .w-3\.5, .w-3\.5 { width: 0.875rem; }
+    .h-3\.5, .h-3\.5 { height: 0.875rem; }
+    .max-h-\[82vh\] { max-height: 82vh; }
+    .overflow-hidden { overflow: hidden; }
+    .overflow-y-auto { overflow-y: auto; }
+    .cursor-crosshair { cursor: crosshair; }
+    .pointer-events-none { pointer-events: none; }
+    .pointer-events-auto { pointer-events: auto; }
+    .z-0 { z-index: 0; }
+    .z-10 { z-index: 10; }
+    .z-30 { z-index: 30; }
+    .z-40 { z-index: 40; }
+
+    /* Margins & Paddings */
+    .m-2 { margin: 0.5rem; }
+    .mb-1 { margin-bottom: 0.25rem; }
+    .mb-2 { margin-bottom: 0.5rem; }
+    .mb-4 { margin-bottom: 1rem; }
+    .mt-5 { margin-top: 1.25rem; }
+    .p-1 { padding: 0.25rem; }
+    .p-2 { padding: 0.5rem; }
+    .p-2\.5 { padding: 0.625rem; }
+    .p-3 { padding: 0.75rem; }
+    .p-5 { padding: 1.25rem; }
+    .px-2 { padding-left: 0.5rem; padding-right: 0.5rem; }
+    .px-3 { padding-left: 0.75rem; padding-right: 0.75rem; }
+    .px-3\.5 { padding-left: 0.875rem; padding-right: 0.875rem; }
+    .px-4 { padding-left: 1rem; padding-right: 1rem; }
+    .py-0\.5 { padding-top: 0.125rem; padding-bottom: 0.125rem; }
+    .py-1\.5 { padding-top: 0.375rem; padding-bottom: 0.375rem; }
+    .py-2 { padding-top: 0.5rem; padding-bottom: 0.5rem; }
+    .pb-3 { padding-bottom: 0.75rem; }
+    .pt-3 { padding-top: 0.75rem; }
+    .top-20 { top: 5rem; }
+    .right-4 { right: 1rem; }
+    .bottom-20 { bottom: 5rem; }
+    .left-1\/2 { left: 50%; }
+
+    /* Gap and spacing */
+    .gap-1\.5 { gap: 0.375rem; }
+    .gap-2 { gap: 0.5rem; }
+    .gap-3 { gap: 0.75rem; }
+    .space-x-2 > * + * { margin-left: 0.5rem; }
+    .space-x-3 > * + * { margin-left: 0.75rem; }
+    .space-y-3\.5 > * + * { margin-top: 0.875rem; }
+
+    /* Borders & Radius */
+    .border { border-width: 1px; border-style: solid; }
+    .border-b { border-bottom-width: 1px; border-bottom-style: solid; }
+    .border-t { border-top-width: 1px; border-top-style: solid; }
+    .border-\[3px\] { border-width: 3px; border-style: solid; }
+    .rounded-lg { border-radius: 0.5rem; }
+    .rounded-xl { border-radius: 0.75rem; }
+    .rounded-2xl { border-radius: 1rem; }
+    .rounded-3xl { border-radius: 1.5rem; }
+    .rounded-full { border-radius: 9999px; }
+
+    /* Typography */
+    .font-hud { font-family: 'Orbitron', monospace; }
+    .font-bold { font-weight: 700; }
+    .font-semibold { font-weight: 600; }
+    .font-medium { font-weight: 500; }
+    .text-xs { font-size: 0.75rem; line-height: 1rem; }
+    .text-sm { font-size: 0.875rem; line-height: 1.25rem; }
+    .text-base { font-size: 1rem; line-height: 1.5rem; }
+    .text-lg { font-size: 1.125rem; line-height: 1.75rem; }
+    .text-\[9px\] { font-size: 9px; }
+    .text-\[10px\] { font-size: 10px; }
+    .leading-none { line-height: 1; }
+    .tracking-wide { letter-spacing: 0.025em; }
+    .tracking-wider { letter-spacing: 0.05em; }
+    .tracking-widest { letter-spacing: 0.1em; }
+
+    /* Color Tokens */
+    .bg-black { background-color: #000000; }
+    .bg-emerald-950\/60 { background-color: rgba(2, 44, 34, 0.6); }
+    .bg-emerald-500\/20 { background-color: rgba(16, 185, 129, 0.2); }
+    .bg-emerald-500\/30 { background-color: rgba(16, 185, 129, 0.3); }
+    .bg-emerald-950\/40 { background-color: rgba(2, 44, 34, 0.4); }
+    .bg-slate-950\/70 { background-color: rgba(2, 6, 23, 0.7); }
+    .bg-slate-900\/90 { background-color: rgba(15, 23, 42, 0.9); }
+    .bg-purple-950\/30 { background-color: rgba(59, 7, 100, 0.3); }
+    .bg-cyan-950\/30 { background-color: rgba(8, 51, 68, 0.3); }
+    .bg-rose-950\/30 { background-color: rgba(76, 5, 25, 0.3); }
+    .bg-rose-950\/40 { background-color: rgba(76, 5, 25, 0.4); }
+    .bg-emerald-400 { background-color: #34d399; }
+    .bg-purple-400 { background-color: #c084fc; }
+    .bg-cyan-400 { background-color: #22d3ee; }
+    .bg-rose-500 { background-color: #f43f5e; }
+
+    .border-emerald-500\/20 { border-color: rgba(16, 185, 129, 0.2); }
+    .border-emerald-500\/30 { border-color: rgba(16, 185, 129, 0.3); }
+    .border-emerald-500\/40 { border-color: rgba(16, 185, 129, 0.4); }
+    .border-emerald-400\/40 { border-color: rgba(52, 211, 153, 0.4); }
+    .border-emerald-400\/50 { border-color: rgba(52, 211, 153, 0.5); }
+    .border-emerald-400\/60 { border-color: rgba(52, 211, 153, 0.6); }
+    .border-sky-500\/30 { border-color: rgba(14, 165, 233, 0.3); }
+    .border-sky-400\/30 { border-color: rgba(56, 189, 248, 0.3); }
+    .border-sky-400\/50 { border-color: rgba(56, 189, 248, 0.5); }
+    .border-purple-500\/30 { border-color: rgba(168, 85, 247, 0.3); }
+    .border-purple-400\/40 { border-color: rgba(192, 132, 252, 0.4); }
+    .border-cyan-500\/40 { border-color: rgba(6, 182, 212, 0.4); }
+    .border-cyan-400\/40 { border-color: rgba(34, 211, 238, 0.4); }
+    .border-amber-500\/40 { border-color: rgba(245, 158, 11, 0.4); }
+    .border-fuchsia-500\/40 { border-color: rgba(217, 70, 239, 0.4); }
+    .border-rose-400\/40 { border-color: rgba(251, 113, 133, 0.4); }
+    .border-rose-500\/40 { border-color: rgba(244, 63, 94, 0.4); }
+    .border-slate-700\/40 { border-color: rgba(51, 65, 85, 0.4); }
+    .border-slate-700\/60 { border-color: rgba(51, 65, 85, 0.6); }
+
+    .text-emerald-300 { color: #6ee7b7; }
+    .text-emerald-400 { color: #34d399; }
+    .text-sky-300 { color: #7dd3fc; }
+    .text-sky-400 { color: #38bdf8; }
+    .text-purple-300 { color: #d8b4fe; }
+    .text-purple-400 { color: #c084fc; }
+    .text-cyan-300 { color: #67e8f9; }
+    .text-amber-300 { color: #fcd34d; }
+    .text-fuchsia-300 { color: #f0abfc; }
+    .text-rose-300 { color: #fda4af; }
+    .text-slate-200 { color: #e2e8f0; }
+    .text-slate-300 { color: #cbd5e1; }
+    .text-slate-400 { color: #94a3b8; }
+    .text-gray-400 { color: #9ca3af; }
+    .text-white { color: #ffffff; }
+
+    /* Gradients */
+    .bg-gradient-to-b {
+      background: linear-gradient(to bottom, rgba(3, 7, 18, 0.92) 0%, rgba(3, 7, 18, 0.6) 70%, transparent 100%);
+    }
+    .bg-gradient-to-t {
+      background: linear-gradient(to top, rgba(3, 7, 18, 0.95) 0%, rgba(3, 7, 18, 0.65) 70%, transparent 100%);
+    }
+
+    /* Glows & Shadows */
+    .shadow-2xl { box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7); }
+    .shadow-\[0_0_8px_\#34d399\] { box-shadow: 0 0 8px #34d399; }
+    .shadow-\[0_0_8px_\#c084fc\] { box-shadow: 0 0 8px #c084fc; }
+    .shadow-\[0_0_8px_\#22d3ee\] { box-shadow: 0 0 8px #22d3ee; }
+    .shadow-\[0_0_8px_\#f43f5e\] { box-shadow: 0 0 8px #f43f5e; }
+    .shadow-\[0_0_10px_rgba\(52\,211\,153\,0\.3\)\] { box-shadow: 0 0 10px rgba(52, 211, 153, 0.3); }
+    .shadow-\[0_0_10px_rgba\(56\,189\,248\,0\.3\)\] { box-shadow: 0 0 10px rgba(56, 189, 248, 0.3); }
+    .shadow-\[0_0_12px_rgba\(245\,158\,11\,0\.2\)\] { box-shadow: 0 0 12px rgba(245, 158, 11, 0.2); }
+    .shadow-\[0_0_12px_rgba\(217\,70\,239\,0\.2\)\] { box-shadow: 0 0 12px rgba(217, 70, 239, 0.2); }
+    .shadow-\[0_0_12px_rgba\(52\,211\,153\,0\.2\)\] { box-shadow: 0 0 12px rgba(52, 211, 153, 0.2); }
+    .shadow-\[0_0_15px_rgba\(52\,211\,153\,0\.3\)\] { box-shadow: 0 0 15px rgba(52, 211, 153, 0.3); }
+    .shadow-\[0_0_20px_rgba\(52\,211\,153\,0\.3\)\] { box-shadow: 0 0 20px rgba(52, 211, 153, 0.3); }
+    .drop-shadow-\[0_0_8px_rgba\(52\,211\,153\,0\.4\)\] { filter: drop-shadow(0 0 8px rgba(52, 211, 153, 0.4)); }
+
+    /* Animations & Transforms */
+    .transition { transition: all 0.15s ease-in-out; }
+    .transition-all { transition: all 0.3s ease-in-out; }
+    .duration-300 { transition-duration: 300ms; }
+    .opacity-0 { opacity: 0; }
+    .opacity-100 { opacity: 1; }
+    .translate-y-0 { transform: translate(-50%, 0); }
+    .translate-y-2 { transform: translate(-50%, 0.5rem); }
+    .-translate-x-1\/2 { transform: translateX(-50%); }
+    .active\:scale-95:active { transform: scale(0.95); }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.6; transform: scale(0.95); }
+    }
+    .animate-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+
+    @keyframes ping {
+      75%, 100% { transform: scale(2); opacity: 0; }
+    }
+    .animate-ping { animation: ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite; }
+
+    /* Interactive state styles */
+    button {
+      cursor: pointer;
+      border: 1px solid transparent;
+      outline: none;
+      background: transparent;
+      color: inherit;
+    }
+    button:hover { opacity: 0.95; }
+    .hover\:bg-cyan-500\/20:hover { background-color: rgba(6, 182, 212, 0.2); }
+    .hover\:bg-emerald-500\/20:hover { background-color: rgba(16, 185, 129, 0.2); }
+    .hover\:bg-amber-500\/20:hover { background-color: rgba(245, 158, 11, 0.2); }
+    .hover\:bg-fuchsia-500\/20:hover { background-color: rgba(217, 70, 239, 0.2); }
+    .hover\:bg-purple-950\/50:hover { background-color: rgba(59, 7, 100, 0.5); }
+    .hover\:bg-cyan-950\/50:hover { background-color: rgba(8, 51, 68, 0.5); }
+    .hover\:bg-rose-950\/50:hover { background-color: rgba(76, 5, 25, 0.5); }
+    .hover\:bg-rose-900\/60:hover { background-color: rgba(136, 19, 55, 0.6); }
+    .hover\:bg-emerald-900\/60:hover { background-color: rgba(6, 78, 59, 0.6); }
+    .hover\:text-slate-200:hover { color: #e2e8f0; }
+    .hover\:text-white:hover { color: #ffffff; }
+
+    /* Responsive media queries */
+    @media (min-width: 640px) {
+      .sm\:m-4 { margin: 1rem; }
+      .sm\:p-5 { padding: 1.25rem; }
+      .sm\:text-lg { font-size: 1.125rem; line-height: 1.75rem; }
+      .sm\:gap-6 { gap: 1.5rem; }
+      .sm\:gap-3 { gap: 0.75rem; }
+      .sm\:w-96 { width: 24rem; }
+      .sm\:right-8 { right: 2rem; }
+    }
+    @media (min-width: 1024px) {
+      .lg\:flex { display: flex; }
+    }
+    @media (max-width: 1023px) {
+      .hidden.lg\:flex { display: none; }
+    }
+
+    /* Glassmorphism Sci-Fi Panels */
+    .glass-hud {
+      background: rgba(8, 15, 30, 0.75);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid rgba(56, 189, 248, 0.25);
+      box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.65), inset 0 0 16px rgba(56, 189, 248, 0.08);
+    }
+
+    .glass-panel {
+      background: rgba(11, 20, 38, 0.88);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(74, 222, 128, 0.28);
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.85);
+    }
+
+    /* Glowing border pulses */
+    @keyframes bioPulse {
+      0%, 100% { border-color: rgba(74, 222, 128, 0.35); box-shadow: 0 0 15px rgba(74, 222, 128, 0.2); }
+      50% { border-color: rgba(56, 189, 248, 0.6); box-shadow: 0 0 25px rgba(56, 189, 248, 0.4); }
+    }
+
+    .bio-container-glow {
+      animation: bioPulse 6s ease-in-out infinite;
+    }
+
+    /* Custom range input slider styling */
+    input[type=range] {
+      -webkit-appearance: none;
+      appearance: none;
+      background: rgba(15, 23, 42, 0.85);
+      height: 6px;
+      border-radius: 4px;
+      outline: none;
+      border: 1px solid rgba(56, 189, 248, 0.3);
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #38bdf8;
+      cursor: pointer;
+      box-shadow: 0 0 10px #38bdf8;
+      border: 2px solid #ffffff;
+      transition: transform 0.1s ease;
+    }
+    input[type=range]::-webkit-slider-thumb:hover {
+      transform: scale(1.2);
+    }
+
+    /* Smooth scroll for panel */
+    .custom-scroll::-webkit-scrollbar {
+      width: 4px;
+    }
+    .custom-scroll::-webkit-scrollbar-thumb {
+      background: rgba(56, 189, 248, 0.35);
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body class="relative w-full h-full select-none overflow-hidden bg-black">
+
+  <!-- Main Simulation Canvas -->
+  <canvas id="simCanvas" class="absolute inset-0 z-0 block w-full h-full cursor-crosshair"></canvas>
+
+  <!-- Specimen Overlay Frame / Petri Grid -->
+  <div class="pointer-events-none absolute inset-0 z-10 bio-container-glow border-[3px] border-emerald-500/20 m-2 sm:m-4 rounded-3xl overflow-hidden flex flex-col justify-between">
+    <!-- Top Bar HUD -->
+    <header class="pointer-events-auto p-3 sm:p-5 flex flex-wrap items-center justify-between gap-3 bg-gradient-to-b from-gray-950/90 to-transparent">
+      <div class="flex items-center space-x-3">
+        <div class="relative flex items-center justify-center w-10 h-10 rounded-xl bg-emerald-950/60 border border-emerald-400/40 text-emerald-400 shadow-[0_0_15px_rgba(52,211,153,0.3)]">
+          <i class="fa-solid fa-dna text-lg animate-pulse"></i>
+        </div>
+        <div>
+          <div class="flex items-center space-x-2">
+            <span class="font-hud font-bold text-base sm:text-lg tracking-wider text-emerald-300 drop-shadow-[0_0_8px_rgba(52,211,153,0.4)]">XENO-SPECIMEN // Ω-88</span>
+            <span id="containmentStatus" class="text-[10px] px-2 py-0.5 rounded-full font-hud font-semibold bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">STABLE</span>
+          </div>
+          <p class="text-xs text-slate-400 font-medium tracking-wide">ORGANIC SOFT-BODY BIOMASS SIMULATION</p>
+        </div>
+      </div>
+
+      <!-- Live Biomass Metrics -->
+      <div class="flex items-center gap-3 sm:gap-6 font-hud text-xs">
+        <div class="glass-hud px-3 py-1.5 rounded-xl border border-emerald-500/30 flex items-center gap-2">
+          <i class="fa-solid fa-weight-hanging text-emerald-400"></i>
+          <div>
+            <div class="text-[9px] text-gray-400 leading-none">MASS</div>
+            <div id="hudMass" class="text-emerald-300 font-bold text-sm">1,240 μg</div>
+          </div>
+        </div>
+
+        <div class="glass-hud px-3 py-1.5 rounded-xl border border-sky-500/30 flex items-center gap-2">
+          <i class="fa-solid fa-utensils text-sky-400"></i>
+          <div>
+            <div class="text-[9px] text-gray-400 leading-none">DEVOURED</div>
+            <div id="hudDevoured" class="text-sky-300 font-bold text-sm">0</div>
+          </div>
+        </div>
+
+        <div class="glass-hud px-3 py-1.5 rounded-xl border border-purple-500/30 flex items-center gap-2">
+          <i class="fa-solid fa-gauge-high text-purple-400"></i>
+          <div>
+            <div class="text-[9px] text-gray-400 leading-none">CELLS</div>
+            <div id="hudCells" class="text-purple-300 font-bold text-sm">1</div>
+          </div>
+        </div>
+
+        <!-- Quick Toggle Buttons -->
+        <button id="toggleAudioBtn" class="glass-hud p-2.5 rounded-xl border border-cyan-500/40 hover:bg-cyan-500/20 active:scale-95 transition text-cyan-300" title="Toggle Procedural Audio">
+          <i id="audioIcon" class="fa-solid fa-volume-xmark text-sm"></i>
+        </button>
+        <button id="toggleSettingsBtn" class="glass-hud p-2.5 rounded-xl border border-emerald-500/40 hover:bg-emerald-500/20 active:scale-95 transition text-emerald-300" title="Containment Settings">
+          <i class="fa-solid fa-sliders text-sm"></i>
+        </button>
+      </div>
+    </header>
+
+    <!-- Bottom Action Ribbon -->
+    <footer class="pointer-events-auto p-3 sm:p-5 flex flex-wrap items-center justify-between gap-3 bg-gradient-to-t from-gray-950/95 via-gray-950/60 to-transparent">
+      <!-- Interaction Modes -->
+      <div class="flex items-center gap-2 bg-slate-950/70 p-1 rounded-2xl border border-slate-700/40 backdrop-blur-md">
+        <button id="modeAutoBtn" class="px-3.5 py-1.5 rounded-xl text-xs font-hud font-semibold transition flex items-center gap-1.5 bg-emerald-500/30 text-emerald-300 border border-emerald-400/50 shadow-[0_0_10px_rgba(52,211,153,0.3)]">
+          <i class="fa-solid fa-robot"></i> <span>HUNT AI</span>
+        </button>
+        <button id="modeManualBtn" class="px-3.5 py-1.5 rounded-xl text-xs font-hud font-semibold transition flex items-center gap-1.5 text-slate-400 hover:text-slate-200">
+          <i class="fa-solid fa-gamepad"></i> <span>PLAYER LURE</span>
+        </button>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="flex items-center gap-2 sm:gap-3">
+        <button id="btnLunge" class="glass-hud px-4 py-2 rounded-xl text-xs font-hud font-bold tracking-wider text-amber-300 border border-amber-500/40 hover:bg-amber-500/20 active:scale-95 transition flex items-center gap-2 shadow-[0_0_12px_rgba(245,158,11,0.2)]">
+          <i class="fa-solid fa-bolt"></i> <span>LUNGE [SPACE]</span>
+        </button>
+        <button id="btnMitosis" class="glass-hud px-4 py-2 rounded-xl text-xs font-hud font-bold tracking-wider text-fuchsia-300 border border-fuchsia-500/40 hover:bg-fuchsia-500/20 active:scale-95 transition flex items-center gap-2 shadow-[0_0_12px_rgba(217,70,239,0.2)]">
+          <i class="fa-solid fa-arrows-split-up-and-left"></i> <span>MITOSIS [M]</span>
+        </button>
+        <button id="btnFeed" class="glass-hud px-4 py-2 rounded-xl text-xs font-hud font-bold tracking-wider text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/20 active:scale-95 transition flex items-center gap-2 shadow-[0_0_12px_rgba(52,211,153,0.2)]">
+          <i class="fa-solid fa-seedling"></i> <span>FEED CLUSTER</span>
+        </button>
+      </div>
+
+      <!-- Helper hint -->
+      <div class="hidden lg:flex items-center gap-2 text-xs text-slate-400 font-hud">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+        <span>CLICK CANVAS TO DROP PREY // DRAG TO ATTRACT SLIME</span>
+      </div>
+    </footer>
+  </div>
+
+  <!-- Floating Control Settings Sidebar Modal -->
+  <div id="settingsPanel" class="hidden absolute top-20 right-4 sm:right-8 z-30 w-80 sm:w-96 glass-panel rounded-2xl p-5 border border-sky-400/30 text-slate-200 shadow-2xl transition-all duration-300 custom-scroll max-h-[82vh] overflow-y-auto">
+    <div class="flex items-center justify-between pb-3 border-b border-slate-700/60 mb-4">
+      <div class="flex items-center space-x-2 text-sky-400 font-hud font-bold text-sm tracking-wider">
+        <i class="fa-solid fa-microscope text-base"></i>
+        <span>BIO-LAB CONTROLS</span>
+      </div>
+      <button id="closeSettingsBtn" class="text-slate-400 hover:text-white p-1 rounded-lg">
+        <i class="fa-solid fa-xmark text-lg"></i>
+      </button>
+    </div>
+
+    <!-- Slime Palette Presets -->
+    <div class="mb-4">
+      <label class="block text-xs font-hud text-slate-300 mb-2 tracking-wider">BIOLUMINESCENT PHENOTYPE</label>
+      <div class="grid grid-cols-2 gap-2 text-xs font-hud">
+        <button class="theme-btn active p-2 rounded-xl border border-emerald-400/60 bg-emerald-950/60 text-emerald-300 flex items-center gap-2 transition" data-theme="acid">
+          <span class="w-3.5 h-3.5 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]"></span> Acid Bio
+        </button>
+        <button class="theme-btn p-2 rounded-xl border border-purple-400/40 bg-purple-950/30 text-purple-300 flex items-center gap-2 transition hover:bg-purple-950/50" data-theme="void">
+          <span class="w-3.5 h-3.5 rounded-full bg-purple-400 shadow-[0_0_8px_#c084fc]"></span> Cosmic Void
+        </button>
+        <button class="theme-btn p-2 rounded-xl border border-cyan-400/40 bg-cyan-950/30 text-cyan-300 flex items-center gap-2 transition hover:bg-cyan-950/50" data-theme="plasma">
+          <span class="w-3.5 h-3.5 rounded-full bg-cyan-400 shadow-[0_0_8px_#22d3ee]"></span> Cyber Plasma
+        </button>
+        <button class="theme-btn p-2 rounded-xl border border-rose-400/40 bg-rose-950/30 text-rose-300 flex items-center gap-2 transition hover:bg-rose-950/50" data-theme="eldritch">
+          <span class="w-3.5 h-3.5 rounded-full bg-rose-500 shadow-[0_0_8px_#f43f5e]"></span> Eldritch Crimson
+        </button>
+      </div>
+    </div>
+
+    <!-- Physics & Biological Sliders -->
+    <div class="space-y-3.5 text-xs">
+      <div>
+        <div class="flex justify-between font-hud mb-1">
+          <span class="text-slate-300">ELASTIC TENSION (SPRING)</span>
+          <span id="valElasticity" class="text-sky-300">0.038</span>
+        </div>
+        <input id="sliderElasticity" type="range" min="0.015" max="0.08" step="0.005" value="0.038" class="w-full" />
+      </div>
+
+      <div>
+        <div class="flex justify-between font-hud mb-1">
+          <span class="text-slate-300">INTERNAL SQUISH / JELLY PRESSURE</span>
+          <span id="valPressure" class="text-sky-300">1.0</span>
+        </div>
+        <input id="sliderPressure" type="range" min="0.4" max="2.0" step="0.1" value="1.0" class="w-full" />
+      </div>
+
+      <div>
+        <div class="flex justify-between font-hud mb-1">
+          <span class="text-slate-300">CRAWL MOTILITY (LOCOMOTION)</span>
+          <span id="valSpeed" class="text-sky-300">2.6</span>
+        </div>
+        <input id="sliderSpeed" type="range" min="1.0" max="5.5" step="0.2" value="2.6" class="w-full" />
+      </div>
+
+      <div>
+        <div class="flex justify-between font-hud mb-1">
+          <span class="text-slate-300">SENSORY RADIUS (HUNGER RADAR)</span>
+          <span id="valRadar" class="text-sky-300">420 px</span>
+        </div>
+        <input id="sliderRadar" type="range" min="200" max="800" step="20" value="420" class="w-full" />
+      </div>
+
+      <div>
+        <div class="flex justify-between font-hud mb-1">
+          <span class="text-slate-300">PREY ECOSYSTEM DENSITY</span>
+          <span id="valPreyCount" class="text-sky-300">40</span>
+        </div>
+        <input id="sliderPreyCount" type="range" min="15" max="100" step="5" value="40" class="w-full" />
+      </div>
+    </div>
+
+    <!-- Auxiliary Action Options -->
+    <div class="mt-5 pt-3 border-t border-slate-700/60 flex flex-col gap-2">
+      <button id="btnPurge" class="w-full py-2 bg-rose-950/40 hover:bg-rose-900/60 border border-rose-500/40 rounded-xl text-rose-300 font-hud text-xs tracking-wider transition flex items-center justify-center gap-2">
+        <i class="fa-solid fa-skull"></i> PURGE & RESET SPECIMEN
+      </button>
+      <button id="btnSpawnCritters" class="w-full py-2 bg-emerald-950/40 hover:bg-emerald-900/60 border border-emerald-500/40 rounded-xl text-emerald-300 font-hud text-xs tracking-wider transition flex items-center justify-center gap-2">
+        <i class="fa-solid fa-bug"></i> INJECT FLEEING MICRO-CRITTERS
+      </button>
+    </div>
+  </div>
+
+  <!-- Notification Toast -->
+  <div id="bioToast" class="pointer-events-none fixed bottom-20 left-1/2 -translate-x-1/2 z-40 px-4 py-2 rounded-xl text-xs font-hud font-bold tracking-widest bg-slate-900/90 border border-emerald-400/40 text-emerald-300 shadow-[0_0_20px_rgba(52,211,153,0.3)] transition-all duration-300 opacity-0 translate-y-2">
+    CONTAINMENT BREACH AVERTED
+  </div>
+
+  <script>
+  // ==========================================
+  // PROCEDURAL AUDIO ENGINE (Web Audio API)
+  // ==========================================
+  class BioAudioEngine {
+    constructor() {
+      this.ctx = null;
+      this.enabled = false;
+      this.humOsc = null;
+      this.humGain = null;
+    }
+
+    init() {
+      if (this.ctx) return;
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      this.ctx = new AudioCtx();
+      this.startAmbientHum();
+    }
+
+    startAmbientHum() {
+      if (!this.ctx || this.humOsc) return;
+      try {
+        this.humOsc = this.ctx.createOscillator();
+        this.humGain = this.ctx.createGain();
+
+        // Low frequency alien biological drone
+        this.humOsc.type = 'sine';
+        this.humOsc.frequency.setValueAtTime(58, this.ctx.currentTime); // Deep resonant G1
+        
+        // Tremolo LFO
+        const lfo = this.ctx.createOscillator();
+        const lfoGain = this.ctx.createGain();
+        lfo.frequency.setValueAtTime(0.35, this.ctx.currentTime);
+        lfoGain.gain.setValueAtTime(6, this.ctx.currentTime);
+        lfo.connect(this.humOsc.frequency);
+        lfo.start();
+
+        this.humGain.gain.setValueAtTime(this.enabled ? 0.05 : 0.0, this.ctx.currentTime);
+        this.humOsc.connect(this.humGain);
+        this.humGain.connect(this.ctx.destination);
+        this.humOsc.start();
+      } catch (e) {
+        console.warn("Audio init deferred until user gesture", e);
+      }
+    }
+
+    toggle() {
+      if (!this.ctx) this.init();
+      if (this.ctx && this.ctx.state === 'suspended') {
+        this.ctx.resume();
+      }
+      this.enabled = !this.enabled;
+      if (this.humGain && this.ctx) {
+        this.humGain.gain.setTargetAtTime(this.enabled ? 0.05 : 0.0, this.ctx.currentTime, 0.2);
+      }
+      return this.enabled;
+    }
+
+    // Wet, organic squelch when devouring food
+    playEatSound(pitchModifier = 1.0) {
+      if (!this.enabled || !this.ctx) return;
+      try {
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const filter = this.ctx.createBiquadFilter();
+        const gain = this.ctx.createGain();
+
+        osc.type = 'triangle';
+        const baseFreq = 160 * pitchModifier;
+        osc.frequency.setValueAtTime(baseFreq, now);
+        osc.frequency.exponentialRampToValueAtTime(baseFreq * 2.8, now + 0.07);
+        osc.frequency.exponentialRampToValueAtTime(baseFreq * 0.4, now + 0.22);
+
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(800, now);
+        filter.frequency.exponentialRampToValueAtTime(2800, now + 0.08);
+        filter.frequency.exponentialRampToValueAtTime(300, now + 0.22);
+        filter.Q.value = 5.0;
+
+        gain.gain.setValueAtTime(0.24, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+
+        osc.connect(filter);
+        filter.connect(gain);
+        gain.connect(this.ctx.destination);
+
+        osc.start(now);
+        osc.stop(now + 0.25);
+      } catch (err) {}
+    }
+
+    // Lunge surge whoosh
+    playLungeSound() {
+      if (!this.enabled || !this.ctx) return;
+      try {
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(80, now);
+        osc.frequency.exponentialRampToValueAtTime(340, now + 0.15);
+        osc.frequency.exponentialRampToValueAtTime(50, now + 0.45);
+
+        gain.gain.setValueAtTime(0.35, now);
+        gain.gain.linearRampToValueAtTime(0.01, now + 0.45);
+
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+
+        osc.start(now);
+        osc.stop(now + 0.46);
+      } catch (e) {}
+    }
+
+    // Mitosis cell-division bubble pop
+    playMitosisSound() {
+      if (!this.enabled || !this.ctx) return;
+      try {
+        const now = this.ctx.currentTime;
+        for (let i = 0; i < 2; i++) {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          const delay = i * 0.09;
+
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(260 + i * 140, now + delay);
+          osc.frequency.exponentialRampToValueAtTime(680 + i * 200, now + delay + 0.12);
+
+          gain.gain.setValueAtTime(0.22, now + delay);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + delay + 0.18);
+
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+
+          osc.start(now + delay);
+          osc.stop(now + delay + 0.19);
+        }
+      } catch(e) {}
+    }
+  }
+
+  const audio = new BioAudioEngine();
+
+  // ==========================================
+  // COLOR THEMES & SHADER PALETTES
+  // ==========================================
+  const THEMES = {
+    acid: {
+      name: "Acid Bio",
+      primary: "#22c55e",
+      secondary: "#10b981",
+      core: "#86efac",
+      membrane: "rgba(34, 197, 94, 0.85)",
+      glow: "rgba(74, 222, 128, 0.45)",
+      bodyInner: "rgba(16, 185, 129, 0.38)",
+      trail: "rgba(34, 197, 94, 0.18)",
+      eye: "#facc15"
+    },
+    void: {
+      name: "Cosmic Void",
+      primary: "#a855f7",
+      secondary: "#6366f1",
+      core: "#e9d5ff",
+      membrane: "rgba(168, 85, 247, 0.85)",
+      glow: "rgba(192, 132, 252, 0.45)",
+      bodyInner: "rgba(139, 92, 246, 0.38)",
+      trail: "rgba(168, 85, 247, 0.18)",
+      eye: "#38bdf8"
+    },
+    plasma: {
+      name: "Cyber Plasma",
+      primary: "#06b6d4",
+      secondary: "#3b82f6",
+      core: "#a5f3fc",
+      membrane: "rgba(6, 182, 212, 0.85)",
+      glow: "rgba(56, 189, 248, 0.45)",
+      bodyInner: "rgba(14, 165, 233, 0.38)",
+      trail: "rgba(6, 182, 212, 0.18)",
+      eye: "#f43f5e"
+    },
+    eldritch: {
+      name: "Eldritch Crimson",
+      primary: "#f43f5e",
+      secondary: "#e11d48",
+      core: "#fecdd3",
+      membrane: "rgba(244, 63, 94, 0.85)",
+      glow: "rgba(251, 113, 133, 0.45)",
+      bodyInner: "rgba(225, 29, 72, 0.38)",
+      trail: "rgba(244, 63, 94, 0.18)",
+      eye: "#34d399"
+    }
+  };
+
+  let currentThemeKey = 'acid';
+  let activeTheme = THEMES[currentThemeKey];
+
+  // Global Simulation State Variables
+  const state = {
+    elasticity: 0.038,
+    pressure: 1.0,
+    speed: 2.6,
+    radarRadius: 420,
+    preyTargetCount: 40,
+    playerMode: 'auto', // 'auto' | 'manual'
+    totalDevoured: 0,
+    mouse: { x: window.innerWidth / 2, y: window.innerHeight / 2, isDown: false }
+  };
+
+  // ==========================================
+  // SLIME ORGANISM & SOFT-BODY DYNAMICS
+  // ==========================================
+  class SlimeCell {
+    constructor(x, y, radius = 55) {
+      this.x = x;
+      this.y = y;
+      this.vx = 0;
+      this.vy = 0;
+      this.baseRadius = radius;
+      this.radius = radius;
+      this.targetRadius = radius;
+      this.mass = Math.round(radius * radius * 0.4);
+
+      // Soft-body membrane node vertices (ring of interconnected spring-mass points)
+      this.numNodes = 24;
+      this.nodes = [];
+      for (let i = 0; i < this.numNodes; i++) {
+        const angle = (i / this.numNodes) * Math.PI * 2;
+        this.nodes.push({
+          x: this.x + Math.cos(angle) * this.radius,
+          y: this.y + Math.sin(angle) * this.radius,
+          vx: 0,
+          vy: 0,
+          targetAngle: angle,
+          dist: this.radius,
+          undulationSpeed: 1.5 + Math.random() * 2.0,
+          undulationPhase: Math.random() * Math.PI * 2
+        });
+      }
+
+      // Internal bioluminescent organelles & wandering alien eyes
+      this.organelles = [];
+      const organelleCount = 6;
+      for (let i = 0; i < organelleCount; i++) {
+        this.organelles.push({
+          relX: (Math.random() - 0.5) * radius * 0.8,
+          relY: (Math.random() - 0.5) * radius * 0.8,
+          radius: 4 + Math.random() * 6,
+          pulseSpeed: 1.2 + Math.random() * 2.0,
+          phase: Math.random() * Math.PI * 2
+        });
+      }
+
+      // 2 to 3 wandering alien sensory eyes that track movement
+      this.eyes = [
+        { relX: -radius * 0.28, relY: -radius * 0.22, pupilX: 0, pupilY: 0, size: 7.5, blink: 0 },
+        { relX: radius * 0.28, relY: -radius * 0.25, pupilX: 0, pupilY: 0, size: 6.5, blink: 0 },
+        { relX: 0, relY: radius * 0.15, pupilX: 0, pupilY: 0, size: 5.0, blink: 0 }
+      ];
+
+      // Digested bioluminescent particles circulating in belly
+      this.bellyParticles = [];
+
+      this.lungeEnergy = 100;
+      this.isLunging = false;
+      this.lungeTimer = 0;
+      this.crawlCycle = Math.random() * Math.PI * 2;
+      this.targetPrey = null;
+      this.splitCooldown = 0;
+    }
+
+    // Trigger explosive forward amoebic stretch
+    lunge() {
+      if (this.lungeTimer > 0) return;
+      this.isLunging = true;
+      this.lungeTimer = 40; // frames
+      audio.playLungeSound();
+      showToast("METABOLIC SURGE // LUNGE ACTIVE");
+    }
+
+    update(bounds, allFood, allSlimes) {
+      this.crawlCycle += 0.05 * (state.speed / 2.0);
+      if (this.lungeTimer > 0) {
+        this.lungeTimer--;
+        if (this.lungeTimer === 0) this.isLunging = false;
+      }
+      if (this.splitCooldown > 0) this.splitCooldown--;
+
+      // Target selection logic
+      let destX = this.x;
+      let destY = this.y;
+
+      if (state.playerMode === 'manual') {
+        destX = state.mouse.x;
+        destY = state.mouse.y;
+      } else {
+        // Autonomous predatory AI: Find highest nutrition prey within radar range
+        let closestFood = null;
+        let minDist = state.radarRadius;
+
+        for (let i = 0; i < allFood.length; i++) {
+          const f = allFood[i];
+          const dx = f.x - this.x;
+          const dy = f.y - this.y;
+          const d = Math.hypot(dx, dy);
+
+          // Weight critters slightly higher
+          const priorityDist = f.type === 'critter' ? d * 0.75 : d;
+          if (priorityDist < minDist) {
+            minDist = priorityDist;
+            closestFood = f;
+          }
+        }
+        this.targetPrey = closestFood;
+
+        if (closestFood) {
+          destX = closestFood.x;
+          destY = closestFood.y;
+        } else {
+          // Wander gently if satiated or radar is empty
+          destX = this.x + Math.cos(this.crawlCycle * 0.4) * 120;
+          destY = this.y + Math.sin(this.crawlCycle * 0.3) * 120;
+        }
+      }
+
+      // Locomotion physics: Amoeboid crawling pulse
+      const toTargetDx = destX - this.x;
+      const toTargetDy = destY - this.y;
+      const distToTarget = Math.hypot(toTargetDx, toTargetDy);
+
+      let currentSpeed = state.speed;
+      if (this.isLunging) currentSpeed *= 3.4;
+
+      if (distToTarget > 15) {
+        // Natural pulsing amoebic motion (inchworm squish & stretch)
+        const pulse = Math.sin(this.crawlCycle) * 0.4 + 0.6;
+        const moveForce = (currentSpeed * pulse) / Math.max(distToTarget, 1);
+
+        this.vx += toTargetDx * moveForce * 0.12;
+        this.vy += toTargetDy * moveForce * 0.12;
+      }
+
+      // Slime damping / friction
+      this.vx *= 0.88;
+      this.vy *= 0.88;
+
+      this.x += this.vx;
+      this.y += this.vy;
+
+      // Soft-body containment boundaries with cushion bounce
+      const margin = this.radius * 1.1;
+      if (this.x < margin) { this.x = margin; this.vx *= -0.5; }
+      if (this.x > bounds.width - margin) { this.x = bounds.width - margin; this.vx *= -0.5; }
+      if (this.y < margin) { this.y = margin; this.vy *= -0.5; }
+      if (this.y > bounds.height - margin) { this.y = bounds.height - margin; this.vy *= -0.5; }
+
+      // Smooth radius scaling when growing from meals
+      this.radius += (this.targetRadius - this.radius) * 0.08;
+      this.mass = Math.round(this.radius * this.radius * 0.4);
+
+      // Soft-body membrane dynamics (springs + internal pressure + pseudopod extension)
+      const moveAngle = Math.atan2(this.vy, this.vx);
+      const moveMagnitude = Math.hypot(this.vx, this.vy);
+
+      for (let i = 0; i < this.numNodes; i++) {
+        const node = this.nodes[i];
+        
+        // Biological breathing / rippling undulation
+        const undulation = Math.sin(this.crawlCycle * node.undulationSpeed + node.undulationPhase) * (this.radius * 0.07);
+
+        // Pseudopod elongation in the direction of movement
+        const angleDiff = Math.cos(node.targetAngle - moveAngle);
+        let elongation = 0;
+        if (moveMagnitude > 0.4) {
+          elongation = angleDiff * (moveMagnitude * 4.5);
+        }
+
+        // Lunging stretch
+        if (this.isLunging && angleDiff > 0.4) {
+          elongation += angleDiff * (this.radius * 0.7);
+        }
+
+        // Ideal rest point for this membrane node
+        const restDist = (this.radius + undulation + elongation) * state.pressure;
+        const targetX = this.x + Math.cos(node.targetAngle) * restDist;
+        const targetY = this.y + Math.sin(node.targetAngle) * restDist;
+
+        // Hooke's Law Spring Force towards rest position
+        const fx = (targetX - node.x) * state.elasticity;
+        const fy = (targetY - node.y) * state.elasticity;
+
+        node.vx = (node.vx + fx) * 0.84;
+        node.vy = (node.vy + fy) * 0.84;
+
+        node.x += node.vx;
+        node.y += node.vy;
+      }
+
+      // Smooth neighbor spring cohesion (keeps the membrane smooth and continuous)
+      for (let i = 0; i < this.numNodes; i++) {
+        const prev = this.nodes[(i - 1 + this.numNodes) % this.numNodes];
+        const next = this.nodes[(i + 1) % this.numNodes];
+        const curr = this.nodes[i];
+
+        const avgX = (prev.x + next.x) * 0.5;
+        const avgY = (prev.y + next.y) * 0.5;
+
+        curr.x += (avgX - curr.x) * 0.08;
+        curr.y += (avgY - curr.y) * 0.08;
+      }
+
+      // Update digested belly particles
+      for (let i = this.bellyParticles.length - 1; i >= 0; i--) {
+        const bp = this.bellyParticles[i];
+        bp.life -= 0.015;
+        bp.x += bp.vx;
+        bp.y += bp.vy;
+
+        // Pull toward core
+        const toCoreX = this.x - bp.x;
+        const toCoreY = this.y - bp.y;
+        bp.vx = bp.vx * 0.9 + toCoreX * 0.01;
+        bp.vy = bp.vy * 0.9 + toCoreY * 0.01;
+
+        if (bp.life <= 0) {
+          this.bellyParticles.splice(i, 1);
+        }
+      }
+
+      // Update eyes tracking target or lure
+      for (let eye of this.eyes) {
+        eye.blink -= 0.02;
+        if (eye.blink <= -1.0) eye.blink = Math.random() > 0.8 ? 0.8 : 0;
+
+        const eyeGlobalX = this.x + eye.relX;
+        const eyeGlobalY = this.y + eye.relY;
+        const eyeDx = destX - eyeGlobalX;
+        const eyeDy = destY - eyeGlobalY;
+        const eyeAngle = Math.atan2(eyeDy, eyeDx);
+        const lookDist = Math.min(Math.hypot(eyeDx, eyeDy) * 0.03, eye.size * 0.45);
+
+        eye.pupilX += (Math.cos(eyeAngle) * lookDist - eye.pupilX) * 0.2;
+        eye.pupilY += (Math.sin(eyeAngle) * lookDist - eye.pupilY) * 0.2;
+      }
+    }
+
+    // Ingest matter, increase mass, and trigger internal spark reactions
+    consume(food, effectsEngine) {
+      this.targetRadius = Math.min(this.targetRadius + food.nutrition * 0.8, 140);
+      state.totalDevoured++;
+      audio.playEatSound(Math.max(0.6, 1.8 - (this.radius / 100)));
+
+      // Spawn glowing digested belly particles
+      for (let i = 0; i < 6; i++) {
+        this.bellyParticles.push({
+          x: food.x,
+          y: food.y,
+          vx: (Math.random() - 0.5) * 2.5,
+          vy: (Math.random() - 0.5) * 2.5,
+          color: food.color,
+          size: 3 + Math.random() * 4,
+          life: 1.0
+        });
+      }
+
+      // Ripple membrane impact shockwave at nearest node
+      let nearestNode = this.nodes[0];
+      let minD = Infinity;
+      for (let node of this.nodes) {
+        const d = Math.hypot(node.x - food.x, node.y - food.y);
+        if (d < minD) {
+          minD = d;
+          nearestNode = node;
+        }
+      }
+      nearestNode.vx += (food.x - this.x) * 0.15;
+      nearestNode.vy += (food.y - this.y) * 0.15;
+
+      effectsEngine.spawnIngestionSplash(food.x, food.y, food.color);
+    }
+  }
+
+  // ==========================================
+  // PREY & NUTRIENT MATTER ECOSYSTEM
+  // ==========================================
+  class PreyEcosystem {
+    constructor() {
+      this.items = [];
+      this.types = [
+        { type: 'spore', name: 'Radiant Spore', nutrition: 2.2, color: '#4ade80', radius: 7 },
+        { type: 'crystal', name: 'Crystal Shard', nutrition: 3.5, color: '#38bdf8', radius: 8 },
+        { type: 'critter', name: 'Micro-Critter', nutrition: 6.0, color: '#f43f5e', radius: 10 },
+        { type: 'droplet', name: 'Bio-Lipid', nutrition: 1.8, color: '#facc15', radius: 6 },
+        { type: 'energy', name: 'Plasma Cluster', nutrition: 4.5, color: '#c084fc', radius: 9 }
+      ];
+    }
+
+    spawn(width, height, forcedType = null, posX = null, posY = null) {
+      const margin = 50;
+      const x = posX !== null ? posX : margin + Math.random() * (width - margin * 2);
+      const y = posY !== null ? posY : margin + Math.random() * (height - margin * 2);
+
+      const template = forcedType 
+        ? this.types.find(t => t.type === forcedType) 
+        : this.types[Math.floor(Math.random() * this.types.length)];
+
+      this.items.push({
+        ...template,
+        id: Math.random(),
+        x: x,
+        y: y,
+        vx: (Math.random() - 0.5) * (template.type === 'critter' ? 2.5 : 0.4),
+        vy: (Math.random() - 0.5) * (template.type === 'critter' ? 2.5 : 0.4),
+        angle: Math.random() * Math.PI * 2,
+        pulseOffset: Math.random() * Math.PI * 2,
+        wobble: 0,
+        fleeing: false
+      });
+    }
+
+    update(width, height, slimes) {
+      const now = performance.now() * 0.003;
+
+      for (let i = this.items.length - 1; i >= 0; i--) {
+        const item = this.items[i];
+
+        // Micro-critters possess dynamic flee instinct
+        if (item.type === 'critter') {
+          item.fleeing = false;
+          for (let slime of slimes) {
+            const dx = item.x - slime.x;
+            const dy = item.y - slime.y;
+            const dist = Math.hypot(dx, dy);
+
+            // Evade slime if within sensory boundary
+            if (dist < 180) {
+              item.fleeing = true;
+              const fleeForce = (180 - dist) / 180;
+              item.vx += (dx / dist) * fleeForce * 1.8;
+              item.vy += (dy / dist) * fleeForce * 1.8;
+            }
+          }
+
+          // Critter swim twitch
+          item.angle += (Math.random() - 0.5) * 0.3;
+          item.vx += Math.cos(item.angle) * 0.35;
+          item.vy += Math.sin(item.angle) * 0.35;
+          item.vx *= 0.91;
+          item.vy *= 0.91;
+        } else {
+          // Floating drifting spores
+          item.vx += Math.cos(now + item.pulseOffset) * 0.04;
+          item.vy += Math.sin(now + item.pulseOffset) * 0.04;
+          item.vx *= 0.94;
+          item.vy *= 0.94;
+        }
+
+        item.x += item.vx;
+        item.y += item.vy;
+
+        // Petri dish walls bounce
+        const pad = 30;
+        if (item.x < pad) { item.x = pad; item.vx *= -1; }
+        if (item.x > width - pad) { item.x = width - pad; item.vx *= -1; }
+        if (item.y < pad) { item.y = pad; item.vy *= -1; }
+        if (item.y > height - pad) { item.y = height - pad; item.vy *= -1; }
+      }
+    }
+  }
+
+  // ==========================================
+  // VISUAL EFFECTS ENGINE & RESIDUAL TRAILS
+  // ==========================================
+  class EffectsEngine {
+    constructor() {
+      this.particles = [];
+      this.trails = [];
+      this.shockwaves = [];
+    }
+
+    addTrail(x, y, radius, color) {
+      // Periodic sticky bioluminescent slime footprint on the petri floor
+      if (Math.random() > 0.4) return;
+      this.trails.push({
+        x: x + (Math.random() - 0.5) * radius * 0.5,
+        y: y + (Math.random() - 0.5) * radius * 0.5,
+        radius: 6 + Math.random() * (radius * 0.35),
+        alpha: 0.55,
+        color: color
+      });
+    }
+
+    spawnIngestionSplash(x, y, color) {
+      // Ingestion flash particles
+      for (let i = 0; i < 16; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 1.5 + Math.random() * 5.0;
+        this.particles.push({
+          x: x,
+          y: y,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          size: 2.5 + Math.random() * 4.5,
+          color: color,
+          alpha: 1.0,
+          decay: 0.02 + Math.random() * 0.03
+        });
+      }
+
+      // Engulf shockwave ripple ring
+      this.shockwaves.push({
+        x: x,
+        y: y,
+        radius: 8,
+        maxRadius: 65,
+        alpha: 0.9,
+        color: color
+      });
+    }
+
+    update() {
+      // Trails fade slowly over time
+      for (let i = this.trails.length - 1; i >= 0; i--) {
+        const t = this.trails[i];
+        t.alpha -= 0.0035;
+        if (t.alpha <= 0) this.trails.splice(i, 1);
+      }
+
+      // Particles physics
+      for (let i = this.particles.length - 1; i >= 0; i--) {
+        const p = this.particles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vx *= 0.93;
+        p.vy *= 0.93;
+        p.alpha -= p.decay;
+        if (p.alpha <= 0) this.particles.splice(i, 1);
+      }
+
+      // Shockwaves expanding
+      for (let i = this.shockwaves.length - 1; i >= 0; i--) {
+        const s = this.shockwaves[i];
+        s.radius += (s.maxRadius - s.radius) * 0.12 + 1.2;
+        s.alpha -= 0.035;
+        if (s.alpha <= 0 || s.radius >= s.maxRadius) {
+          this.shockwaves.splice(i, 1);
+        }
+      }
+    }
+
+    draw(ctx) {
+      // Render slime floor residue trails
+      ctx.save();
+      for (let t of this.trails) {
+        ctx.beginPath();
+        ctx.arc(t.x, t.y, t.radius, 0, Math.PI * 2);
+        ctx.fillStyle = activeTheme.trail;
+        ctx.globalAlpha = t.alpha;
+        ctx.fill();
+      }
+      ctx.restore();
+
+      // Render shockwave ripple rings
+      ctx.save();
+      for (let s of this.shockwaves) {
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, s.radius, 0, Math.PI * 2);
+        ctx.strokeStyle = s.color;
+        ctx.lineWidth = 2.5;
+        ctx.globalAlpha = s.alpha;
+        ctx.shadowColor = s.color;
+        ctx.shadowBlur = 12;
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      // Render burst particles
+      ctx.save();
+      for (let p of this.particles) {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        ctx.fillStyle = p.color;
+        ctx.globalAlpha = p.alpha;
+        ctx.shadowColor = p.color;
+        ctx.shadowBlur = 8;
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+  }
+
+  // ==========================================
+  // SLIME RENDERING ENGINE (Bioluminescence)
+  // ==========================================
+  function renderSlime(ctx, slime) {
+    const nodes = slime.nodes;
+    const num = nodes.length;
+
+    ctx.save();
+
+    // 1. Exterior Radiance & Glow Blur
+    ctx.shadowColor = activeTheme.glow;
+    ctx.shadowBlur = slime.isLunging ? 45 : 25;
+
+    // 2. Smooth Jelly Membrane using Catmull-Rom/Bezier Spline Path
+    ctx.beginPath();
+    const firstMidX = (nodes[0].x + nodes[1].x) * 0.5;
+    const firstMidY = (nodes[0].y + nodes[1].y) * 0.5;
+    ctx.moveTo(firstMidX, firstMidY);
+
+    for (let i = 1; i < num; i++) {
+      const nextNode = nodes[(i + 1) % num];
+      const currNode = nodes[i];
+      const midX = (currNode.x + nextNode.x) * 0.5;
+      const midY = (currNode.y + nextNode.y) * 0.5;
+      ctx.quadraticCurveTo(currNode.x, currNode.y, midX, midY);
+    }
+    // Close loop back to first mid
+    ctx.quadraticCurveTo(nodes[0].x, nodes[0].y, firstMidX, firstMidY);
+    ctx.closePath();
+
+    // Fill with semi-transparent gelatinous gradient
+    const grad = ctx.createRadialGradient(slime.x, slime.y, slime.radius * 0.15, slime.x, slime.y, slime.radius * 1.15);
+    grad.addColorStop(0, activeTheme.core);
+    grad.addColorStop(0.35, activeTheme.primary);
+    grad.addColorStop(0.75, activeTheme.bodyInner);
+    grad.addColorStop(1, 'rgba(0, 0, 0, 0.05)');
+
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    // Outer membrane line
+    ctx.lineWidth = slime.isLunging ? 4.5 : 3.0;
+    ctx.strokeStyle = activeTheme.membrane;
+    ctx.stroke();
+
+    // Reset shadow for internal details
+    ctx.shadowBlur = 0;
+
+    // 3. Render Internal Pulsing Organelles / Nuclei
+    const time = performance.now() * 0.002;
+    for (let org of slime.organelles) {
+      const orgX = slime.x + org.relX;
+      const orgY = slime.y + org.relY;
+      const pulseSize = org.radius + Math.sin(time * org.pulseSpeed + org.phase) * 1.5;
+
+      const orgGrad = ctx.createRadialGradient(orgX, orgY, 1, orgX, orgY, pulseSize);
+      orgGrad.addColorStop(0, '#ffffff');
+      orgGrad.addColorStop(0.4, activeTheme.core);
+      orgGrad.addColorStop(1, 'transparent');
+
+      ctx.beginPath();
+      ctx.arc(orgX, orgY, pulseSize, 0, Math.PI * 2);
+      ctx.fillStyle = orgGrad;
+      ctx.fill();
+    }
+
+    // 4. Render Digested Swirling Particles Inside Belly
+    for (let bp of slime.bellyParticles) {
+      ctx.beginPath();
+      ctx.arc(bp.x, bp.y, bp.size * bp.life, 0, Math.PI * 2);
+      ctx.fillStyle = bp.color;
+      ctx.globalAlpha = bp.life * 0.85;
+      ctx.shadowColor = bp.color;
+      ctx.shadowBlur = 10;
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1.0;
+    ctx.shadowBlur = 0;
+
+    // 5. Render Alien Tracking Eyes
+    for (let eye of slime.eyes) {
+      if (eye.blink > 0.5) continue; // Blinking
+      const eyeX = slime.x + eye.relX;
+      const eyeY = slime.y + eye.relY;
+
+      // Sclera / Outer Eye Lens
+      ctx.beginPath();
+      ctx.arc(eyeX, eyeY, eye.size, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.92)';
+      ctx.shadowColor = activeTheme.primary;
+      ctx.shadowBlur = 8;
+      ctx.fill();
+
+      // Slit Alien Pupil
+      ctx.save();
+      ctx.translate(eyeX + eye.pupilX, eyeY + eye.pupilY);
+      ctx.scale(0.55, 1.0);
+      ctx.beginPath();
+      ctx.arc(0, 0, eye.size * 0.52, 0, Math.PI * 2);
+      ctx.fillStyle = activeTheme.eye;
+      ctx.fill();
+      ctx.restore();
+
+      // Eye specular gloss highlight
+      ctx.beginPath();
+      ctx.arc(eyeX - eye.size * 0.35, eyeY - eye.size * 0.35, eye.size * 0.28, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+      ctx.fill();
+    }
+
+    // 6. Draw Pseudopod / Tentacle Tendril Reach if Targeting Prey
+    if (slime.targetPrey && state.playerMode === 'auto') {
+      const p = slime.targetPrey;
+      const dist = Math.hypot(p.x - slime.x, p.y - slime.y);
+      if (dist < slime.radius * 2.4 && dist > slime.radius * 0.7) {
+        ctx.beginPath();
+        ctx.moveTo(slime.x, slime.y);
+        const midCtrlX = (slime.x + p.x) * 0.5 + Math.sin(time * 3) * 16;
+        const midCtrlY = (slime.y + p.y) * 0.5 + Math.cos(time * 3) * 16;
+        ctx.quadraticCurveTo(midCtrlX, midCtrlY, p.x, p.y);
+        ctx.strokeStyle = activeTheme.primary;
+        ctx.lineWidth = Math.max(1, (1.0 - (dist / (slime.radius * 2.4))) * 4);
+        ctx.globalAlpha = 0.5;
+        ctx.stroke();
+        ctx.globalAlpha = 1.0;
+      }
+    }
+
+    ctx.restore();
+  }
+
+  // ==========================================
+  // PREY & BACKGROUND GRID RENDERING
+  // ==========================================
+  function renderPrey(ctx, preyList) {
+    const time = performance.now() * 0.003;
+
+    for (let item of preyList) {
+      ctx.save();
+      ctx.translate(item.x, item.y);
+
+      const pulse = 1 + Math.sin(time * 2 + item.pulseOffset) * 0.15;
+      ctx.shadowColor = item.color;
+      ctx.shadowBlur = 10;
+
+      if (item.type === 'spore') {
+        // Glowing organic pulsating spore
+        ctx.beginPath();
+        ctx.arc(0, 0, item.radius * pulse, 0, Math.PI * 2);
+        ctx.fillStyle = item.color;
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(0, 0, item.radius * 0.45, 0, Math.PI * 2);
+        ctx.fillStyle = '#ffffff';
+        ctx.fill();
+      } else if (item.type === 'crystal') {
+        // Iridescent angular geometric nutrient crystal
+        ctx.rotate(time + item.pulseOffset);
+        ctx.beginPath();
+        const r = item.radius * pulse;
+        ctx.moveTo(0, -r);
+        ctx.lineTo(r * 0.8, 0);
+        ctx.lineTo(0, r);
+        ctx.lineTo(-r * 0.8, 0);
+        ctx.closePath();
+        ctx.fillStyle = item.color;
+        ctx.fill();
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1.2;
+        ctx.stroke();
+      } else if (item.type === 'critter') {
+        // Fleeing micro-organism with wagging flagellum tail
+        ctx.rotate(Math.atan2(item.vy, item.vx));
+        
+        // Flagellum tail
+        ctx.beginPath();
+        ctx.moveTo(-item.radius, 0);
+        const wave = Math.sin(time * 12 + item.pulseOffset) * 6;
+        ctx.quadraticCurveTo(-item.radius - 8, wave, -item.radius - 16, -wave);
+        ctx.strokeStyle = item.color;
+        ctx.lineWidth = 2.0;
+        ctx.stroke();
+
+        // Critter body
+        ctx.beginPath();
+        ctx.ellipse(0, 0, item.radius * 1.2, item.radius * 0.7, 0, 0, Math.PI * 2);
+        ctx.fillStyle = item.color;
+        ctx.fill();
+
+        // Eyes
+        ctx.beginPath();
+        ctx.arc(item.radius * 0.6, -3, 2, 0, Math.PI * 2);
+        ctx.arc(item.radius * 0.6, 3, 2, 0, Math.PI * 2);
+        ctx.fillStyle = '#ffffff';
+        ctx.fill();
+      } else if (item.type === 'droplet') {
+        // Bio-lipid nutrient bubble
+        ctx.beginPath();
+        ctx.arc(0, 0, item.radius * pulse, 0, Math.PI * 2);
+        ctx.fillStyle = item.color;
+        ctx.fill();
+      } else if (item.type === 'energy') {
+        // Radiating plasma node
+        ctx.beginPath();
+        ctx.arc(0, 0, item.radius * pulse, 0, Math.PI * 2);
+        ctx.fillStyle = item.color;
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(0, 0, item.radius * 1.5 * pulse, 0, Math.PI * 2);
+        ctx.strokeStyle = item.color;
+        ctx.lineWidth = 1.0;
+        ctx.stroke();
+      }
+
+      ctx.restore();
+    }
+  }
+
+  function renderBioBackground(ctx, width, height) {
+    // Deep bio-containment petri dish grid pattern
+    ctx.fillStyle = '#030712';
+    ctx.fillRect(0, 0, width, height);
+
+    ctx.save();
+    ctx.strokeStyle = 'rgba(30, 41, 59, 0.45)';
+    ctx.lineWidth = 1;
+
+    const gridSize = 45;
+    for (let x = 0; x < width; x += gridSize) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, height);
+      ctx.stroke();
+    }
+    for (let y = 0; y < height; y += gridSize) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(width, y);
+      ctx.stroke();
+    }
+
+    // Petri dish circular measurement rings in center
+    const centerX = width * 0.5;
+    const centerY = height * 0.5;
+    ctx.strokeStyle = 'rgba(56, 189, 248, 0.06)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, Math.min(width, height) * 0.4, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, Math.min(width, height) * 0.2, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Subtle dark vignette
+    const vignette = ctx.createRadialGradient(centerX, centerY, Math.min(width, height) * 0.2, centerX, centerY, Math.max(width, height) * 0.7);
+    vignette.addColorStop(0, 'transparent');
+    vignette.addColorStop(1, 'rgba(0, 0, 0, 0.75)');
+    ctx.fillStyle = vignette;
+    ctx.fillRect(0, 0, width, height);
+
+    ctx.restore();
+  }
+
+  // ==========================================
+  // SIMULATION MANAGER & MITOSIS LOGIC
+  // ==========================================
+  const canvas = document.getElementById('simCanvas');
+  const ctx = canvas.getContext('2d');
+
+  let width = (canvas.width = window.innerWidth);
+  let height = (canvas.height = window.innerHeight);
+
+  window.addEventListener('resize', () => {
+    width = canvas.width = window.innerWidth;
+    height = canvas.height = window.innerHeight;
+  });
+
+  const effects = new EffectsEngine();
+  const ecosystem = new PreyEcosystem();
+  let slimes = [new SlimeCell(width / 2, height / 2, 60)];
+
+  // Seed initial ecosystem
+  for (let i = 0; i < state.preyTargetCount; i++) {
+    ecosystem.spawn(width, height);
+  }
+
+  // Split / Mitosis mechanic: Divides main slime into twin specimens
+  function triggerMitosis() {
+    if (slimes.length >= 4) {
+      showToast("MAX MITOSIS REACHED // CELL MERGE PENDING");
+      return;
+    }
+    const parent = slimes[0];
+    if (parent.radius < 42) {
+      showToast("MASS INSUFFICIENT FOR CELL DIVISION");
+      return;
+    }
+
+    audio.playMitosisSound();
+    const newRadius = parent.radius * 0.72;
+    parent.targetRadius = newRadius;
+    parent.radius = newRadius;
+
+    const angle = Math.random() * Math.PI * 2;
+    const offset = newRadius * 1.6;
+
+    const twin = new SlimeCell(parent.x + Math.cos(angle) * offset, parent.y + Math.sin(angle) * offset, newRadius);
+    twin.vx = Math.cos(angle) * 4;
+    twin.vy = Math.sin(angle) * 4;
+    twin.splitCooldown = 180; // Delay before recombining
+
+    slimes.push(twin);
+    showToast("CELL MITOSIS COMPLETE // 2 CELLS ACTIVE");
+    updateHUD();
+  }
+
+  // Merge slimes back together when touching after cooldown
+  function checkSlimeInteractions() {
+    for (let i = 0; i < slimes.length; i++) {
+      for (let j = i + 1; j < slimes.length; j++) {
+        const s1 = slimes[i];
+        const s2 = slimes[j];
+        const dx = s2.x - s1.x;
+        const dy = s2.y - s1.y;
+        const dist = Math.hypot(dx, dy);
+
+        if (dist < (s1.radius + s2.radius) * 0.7 && s1.splitCooldown === 0 && s2.splitCooldown === 0) {
+          // Re-absorb into a single larger biomass
+          s1.targetRadius = Math.min(130, Math.sqrt(s1.radius * s1.radius + s2.radius * s2.radius));
+          effects.spawnIngestionSplash((s1.x + s2.x) * 0.5, (s1.y + s2.y) * 0.5, activeTheme.core);
+          audio.playEatSound(0.7);
+          slimes.splice(j, 1);
+          showToast("CELLS RECOMBINED INTO PRIMARY NUCLEUS");
+          updateHUD();
+          return;
+        }
+      }
+    }
+  }
+
+  function updateHUD() {
+    let totalMass = 0;
+    for (let s of slimes) totalMass += s.mass;
+    document.getElementById('hudMass').innerText = totalMass.toLocaleString() + ' μg';
+    document.getElementById('hudDevoured').innerText = state.totalDevoured;
+    document.getElementById('hudCells').innerText = slimes.length;
+  }
+
+  function showToast(msg) {
+    const toast = document.getElementById('bioToast');
+    toast.innerText = msg;
+    toast.classList.remove('opacity-0', 'translate-y-2');
+    toast.classList.add('opacity-100', 'translate-y-0');
+    setTimeout(() => {
+      toast.classList.remove('opacity-100', 'translate-y-0');
+      toast.classList.add('opacity-0', 'translate-y-2');
+    }, 2400);
+  }
+
+  // Main Loop
+  function animate() {
+    requestAnimationFrame(animate);
+
+    // 1. Clear & Background
+    renderBioBackground(ctx, width, height);
+
+    // 2. Replenish food matter to meet target density
+    if (ecosystem.items.length < state.preyTargetCount) {
+      ecosystem.spawn(width, height);
+    }
+    ecosystem.update(width, height, slimes);
+
+    // 3. Update Slime Organisms & Ingestion Checks
+    for (let s of slimes) {
+      s.update({ width, height }, ecosystem.items, slimes);
+      effects.addTrail(s.x, s.y, s.radius, activeTheme.primary);
+
+      // Engulf prey detection
+      for (let i = ecosystem.items.length - 1; i >= 0; i--) {
+        const food = ecosystem.items[i];
+        const dist = Math.hypot(food.x - s.x, food.y - s.y);
+
+        if (dist < s.radius * 0.95) {
+          s.consume(food, effects);
+          ecosystem.items.splice(i, 1);
+          updateHUD();
+        }
+      }
+    }
+
+    checkSlimeInteractions();
+
+    // 4. Render Trails & FX
+    effects.update();
+    effects.draw(ctx);
+
+    // 5. Render Prey Elements
+    renderPrey(ctx, ecosystem.items);
+
+    // 6. Render Bioluminescent Slimes
+    for (let s of slimes) {
+      renderSlime(ctx, s);
+    }
+  }
+
+  // ==========================================
+  // USER INPUT & INTERFACE EVENT HANDLERS
+  // ==========================================
+  // Mouse & Touch Tracking
+  function setPointer(e) {
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    state.mouse.x = clientX;
+    state.mouse.y = clientY;
+  }
+
+  window.addEventListener('mousemove', (e) => setPointer(e));
+  window.addEventListener('mousedown', (e) => {
+    state.mouse.isDown = true;
+    setPointer(e);
+    // Left-click on canvas spawns cluster of nutrients
+    if (e.target === canvas) {
+      for (let i = 0; i < 3; i++) {
+        ecosystem.spawn(width, height, null, state.mouse.x + (Math.random() - 0.5) * 50, state.mouse.y + (Math.random() - 0.5) * 50);
+      }
+    }
+  });
+  window.addEventListener('mouseup', () => (state.mouse.isDown = false));
+
+  window.addEventListener('touchmove', (e) => setPointer(e), { passive: true });
+  window.addEventListener('touchstart', (e) => {
+    state.mouse.isDown = true;
+    setPointer(e);
+    if (e.target === canvas) {
+      for (let i = 0; i < 3; i++) {
+        ecosystem.spawn(width, height, null, state.mouse.x + (Math.random() - 0.5) * 50, state.mouse.y + (Math.random() - 0.5) * 50);
+      }
+    }
+  }, { passive: true });
+  window.addEventListener('touchend', () => (state.mouse.isDown = false));
+
+  // Mode Selection
+  const modeAutoBtn = document.getElementById('modeAutoBtn');
+  const modeManualBtn = document.getElementById('modeManualBtn');
+
+  modeAutoBtn.addEventListener('click', () => {
+    state.playerMode = 'auto';
+    modeAutoBtn.className = "px-3.5 py-1.5 rounded-xl text-xs font-hud font-semibold transition flex items-center gap-1.5 bg-emerald-500/30 text-emerald-300 border border-emerald-400/50 shadow-[0_0_10px_rgba(52,211,153,0.3)]";
+    modeManualBtn.className = "px-3.5 py-1.5 rounded-xl text-xs font-hud font-semibold transition flex items-center gap-1.5 text-slate-400 hover:text-slate-200";
+    showToast("AUTONOMOUS PREDATORY HUNT ENGAGED");
+  });
+
+  modeManualBtn.addEventListener('click', () => {
+    state.playerMode = 'manual';
+    modeManualBtn.className = "px-3.5 py-1.5 rounded-xl text-xs font-hud font-semibold transition flex items-center gap-1.5 bg-sky-500/30 text-sky-300 border border-sky-400/50 shadow-[0_0_10px_rgba(56,189,248,0.3)]";
+    modeAutoBtn.className = "px-3.5 py-1.5 rounded-xl text-xs font-hud font-semibold transition flex items-center gap-1.5 text-slate-400 hover:text-slate-200";
+    showToast("MANUAL PHEROMONE LURE ENGAGED");
+  });
+
+  // Action Buttons
+  document.getElementById('btnLunge').addEventListener('click', () => {
+    for (let s of slimes) s.lunge();
+  });
+
+  document.getElementById('btnMitosis').addEventListener('click', () => {
+    triggerMitosis();
+  });
+
+  document.getElementById('btnFeed').addEventListener('click', () => {
+    for (let i = 0; i < 8; i++) {
+      ecosystem.spawn(width, height);
+    }
+    showToast("BIOMASS CLUSTER INJECTED");
+  });
+
+  // Keyboard Shortcuts
+  window.addEventListener('keydown', (e) => {
+    if (e.code === 'Space') {
+      e.preventDefault();
+      for (let s of slimes) s.lunge();
+    } else if (e.code === 'KeyM') {
+      triggerMitosis();
+    }
+  });
+
+  // Audio Toggle
+  const toggleAudioBtn = document.getElementById('toggleAudioBtn');
+  const audioIcon = document.getElementById('audioIcon');
+  toggleAudioBtn.addEventListener('click', () => {
+    const isMuted = !audio.toggle();
+    if (isMuted) {
+      audioIcon.className = "fa-solid fa-volume-xmark text-sm";
+      showToast("ACOUSTIC TELEMETRY MUTED");
+    } else {
+      audioIcon.className = "fa-solid fa-volume-high text-sm text-cyan-300";
+      showToast("SONIC BIO-HUM ENABLED");
+    }
+  });
+
+  // Settings Panel Toggle
+  const settingsPanel = document.getElementById('settingsPanel');
+  document.getElementById('toggleSettingsBtn').addEventListener('click', () => {
+    settingsPanel.classList.toggle('hidden');
+  });
+  document.getElementById('closeSettingsBtn').addEventListener('click', () => {
+    settingsPanel.classList.add('hidden');
+  });
+
+  // Sliders
+  const setupSlider = (id, valId, key, formatFn) => {
+    const el = document.getElementById(id);
+    const valEl = document.getElementById(valId);
+    el.addEventListener('input', (e) => {
+      const v = parseFloat(e.target.value);
+      state[key] = v;
+      valEl.innerText = formatFn ? formatFn(v) : v;
+    });
+  };
+
+  setupSlider('sliderElasticity', 'valElasticity', 'elasticity', v => v.toFixed(3));
+  setupSlider('sliderPressure', 'valPressure', 'pressure', v => v.toFixed(1));
+  setupSlider('sliderSpeed', 'valSpeed', 'speed', v => v.toFixed(1));
+  setupSlider('sliderRadar', 'valRadar', 'radarRadius', v => v + ' px');
+  setupSlider('sliderPreyCount', 'valPreyCount', 'preyTargetCount', v => v);
+
+  // Theme Selectors
+  const themeBtns = document.querySelectorAll('.theme-btn');
+  themeBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      themeBtns.forEach(b => b.classList.remove('active', 'border-emerald-400/60', 'bg-emerald-950/60'));
+      btn.classList.add('active', 'border-emerald-400/60', 'bg-emerald-950/60');
+      const themeKey = btn.getAttribute('data-theme');
+      currentThemeKey = themeKey;
+      activeTheme = THEMES[themeKey];
+      showToast(`PHENOTYPE MUTATED: ${activeTheme.name.toUpperCase()}`);
+    });
+  });
+
+  // Auxiliary Reset & Spawn Buttons
+  document.getElementById('btnPurge').addEventListener('click', () => {
+    slimes = [new SlimeCell(width / 2, height / 2, 55)];
+    state.totalDevoured = 0;
+    ecosystem.items = [];
+    for (let i = 0; i < state.preyTargetCount; i++) ecosystem.spawn(width, height);
+    updateHUD();
+    showToast("SPECIMEN PURGED // GENESIS RESET");
+  });
+
+  document.getElementById('btnSpawnCritters').addEventListener('click', () => {
+    for (let i = 0; i < 6; i++) {
+      ecosystem.spawn(width, height, 'critter');
+    }
+    showToast("INJECTED 6 FLEEING MICRO-CRITTERS");
+  });
+
+  // Initiate Simulation on Load
+  function startSimulation() {
+    updateHUD();
+    animate();
+  }
+
+  if (document.readyState === 'complete' || document.readyState === 'interactive') {
+    startSimulation();
+  } else {
+    window.addEventListener('DOMContentLoaded', startSimulation);
+    window.addEventListener('load', startSimulation);
+  }
+  </script>
+</body>
+</html>

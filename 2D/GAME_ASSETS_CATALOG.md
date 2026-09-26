@@ -39,9 +39,13 @@ The following assets were created via image generation and are stored in [`2D/pu
 | File Name | Dimensions | Purpose & Content |
 | :--- | :--- | :--- |
 | [`slime_sprite_sheet.jpg`](file:///c:/Users/Desktop/Desktop/slime_physics/2D/public/assets/slime/slime_sprite_sheet.jpg) | 1024×1024 | **Complete 2D Animation Sprite Sheet**: <br>• **Row 1**: Idle pulsating gelatinous jiggle cycle<br>• **Rows 2 & 3**: Squish-and-stretch crawling locomotion cycle<br>• **Row 4**: Acid pseudopod stinger lunging / piercing strike<br>• **Row 5**: Amoebic engulfing mouth devouring biomass<br>• **Row 6**: Cellular mitosis splitting into twin daughter slimes |
-| [`slime_phenotypes.jpg`](file:///c:/Users/Desktop/Desktop/slime_phenotypes.jpg) | 1024×1024 | **2×2 Phenotype Character Showcase**: <br>• *Specimen-01: Acid Bio* (Neon green, amber slit eyes)<br>• *Specimen-02: Cosmic Void* (Nebula purple, cyan slit eyes)<br>• *Specimen-03: Cyber Plasma* (Electric cyan, ruby slit eyes)<br>• *Specimen-04: Eldritch Crimson* (Deep red flesh, toxic emerald eyes) |
+| [`slime_phenotypes.jpg`](file:///c:/Users/Desktop/Desktop/slime_physics/2D/public/assets/slime/slime_phenotypes.jpg) | 1024×1024 | **2×2 Phenotype Character Showcase**: <br>• *Specimen-01: Acid Bio* (Neon green, amber slit eyes)<br>• *Specimen-02: Cosmic Void* (Nebula purple, cyan slit eyes)<br>• *Specimen-03: Cyber Plasma* (Electric cyan, ruby slit eyes)<br>• *Specimen-04: Eldritch Crimson* (Deep red flesh, toxic emerald eyes) |
 | [`slime_organelles_kit.jpg`](file:///c:/Users/Desktop/Desktop/slime_physics/2D/public/assets/slime/slime_organelles_kit.jpg) | 1024×1024 | **Modular Anatomy & VFX Sprite Sheet**: <br>• 4 Bioluminescent nucleus cores<br>• Alien slit eyes in scanning, hunting, dilated, and blink frames<br>• Floating digestion bubbles and internal bio-vesicles<br>• Toxic acid splash droplets and slime splatter decals<br>• Piercing acid pseudopod spike elements |
 | [`slime_action_splash.jpg`](file:///c:/Users/Desktop/Desktop/slime_physics/2D/public/assets/slime/slime_action_splash.jpg) | 1024×1024 | **Flagship Key Art / Cover Icon**: <br>• Slime specimen shattering stasis containment cylinder in high-tech red alert laboratory with hazard tape and acid splashes |
+| [`specimen_01_acid_bio_avatar.jpg`](file:///c:/Users/Desktop/Desktop/slime_physics/2D/public/assets/slime/specimen_01_acid_bio_avatar.jpg) | 1024×1024 | **Specimen-01: Acid Bio Organism Avatar & Skin**: <br>• High-res showcase avatar portrait in high-tech sci-fi containment chassis<br>• Translucent emerald gel body with caustic highlights<br>• Bioluminescent amber-yellow nucleus core with filament network<br>• Triple alien vertical slit eyes in golden amber (`#facc15`) |
+| [`specimen_01_idle_sheet.jpg`](file:///c:/Users/Desktop/Desktop/slime_physics/2D/public/assets/slime/specimen_01_idle_sheet.jpg) | 1024×1024 | **Specimen-01 Idle Wobble / Jiggle Cycle (8 Frames)**: <br>• 2×4 sequential animation frame grid<br>• Rhythmic gelatinous breathing, surface tension waves, downward squish compression, upward elastic elongation rebound, settling dampening jiggles |
+| [`specimen_01_crawl_sheet.jpg`](file:///c:/Users/Desktop/Desktop/slime_physics/2D/public/assets/slime/specimen_01_crawl_sheet.jpg) | 1024×1024 | **Specimen-01 Locomotion / Crawl Cycle (8 Frames)**: <br>• 2×4 sequential amoebic crawl animation grid (left to right)<br>• Posterior mass bunching, pseudopod extension, anchor reach, trailing acid droplets, mass glide recovery |
+| [`specimen_01_lunge_sheet.jpg`](file:///c:/Users/Desktop/Desktop/slime_physics/2D/public/assets/slime/specimen_01_lunge_sheet.jpg) | 1024×1024 | **Specimen-01 Lunge Surge / Attack Strike (8 Frames)**: <br>• 2×4 sequential combat attack animation grid<br>• Coiled anticipation spring, explosive forward surge, aerodynamic dash elongation, outstretched piercing acid stinger lance with sparks, impact burst splash, retraction recoil recovery |
 
 ---
 
@@ -49,6 +53,7 @@ The following assets were created via image generation and are stored in [`2D/pu
 
 ### 1.1. Core Organism Avatars & Skins
 * **Specimen-01: Acid Bio** (`#22c55e` / `#4ade80`):
+  * **Asset File**: [`specimen_01_acid_bio_avatar.jpg`](file:///c:/Users/Desktop/Desktop/slime_physics/2D/public/assets/slime/specimen_01_acid_bio_avatar.jpg)
   * Gelatinous translucent emerald body with caustic highlights
   * Bioluminescent yellow/amber nucleus with pulsing filaments
   * 3 alien vertical slit eyes (golden amber `#facc15`)
@@ -66,9 +71,12 @@ The following assets were created via image generation and are stored in [`2D/pu
   * Glowing toxic jade eyes (`#34d399`)
 
 ### 1.2. Slime Animation Keyframes (Sprite Sheet Sequences)
-* **Idle Wobble / Jiggle Cycle** (6–8 frames): Rhythmic breathing, gelatinous surface tension waves.
+* **Idle Wobble / Jiggle Cycle** (8 frames): Rhythmic breathing, gelatinous surface tension waves.
+  * **Asset File**: [`specimen_01_idle_sheet.jpg`](file:///c:/Users/Desktop/Desktop/slime_physics/2D/public/assets/slime/specimen_01_idle_sheet.jpg)
 * **Locomotion / Crawl Cycle** (8 frames): Squish-compress-extend cycle with trailing slime droplets.
-* **Lunge Surge / Attack Strike** (6 frames): Sharp elongation with an outstretched piercing pseudopod stinger.
+  * **Asset File**: [`specimen_01_crawl_sheet.jpg`](file:///c:/Users/Desktop/Desktop/slime_physics/2D/public/assets/slime/specimen_01_crawl_sheet.jpg)
+* **Lunge Surge / Attack Strike** (8 frames): Sharp elongation with an outstretched piercing pseudopod stinger.
+  * **Asset File**: [`specimen_01_lunge_sheet.jpg`](file:///c:/Users/Desktop/Desktop/slime_physics/2D/public/assets/slime/specimen_01_lunge_sheet.jpg)
 * **Engulf / Devour Mouth** (6 frames): Membrane invagination forming a predatory vacuum mouth.
 * **Mitosis Cell Division** (8 frames): Spherical compression, hourglass pinching, dual nuclei separation, cell split, and reverse merge.
 * **Damage & Corrosion Sizzle** (4 frames): Membrane cavitation, caustic yellow froth, flashing damage warning.

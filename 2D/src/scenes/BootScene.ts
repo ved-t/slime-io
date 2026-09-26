@@ -33,6 +33,12 @@ export class BootScene extends Phaser.Scene {
       ctx.fillRect(0, 0, 16, 16);
       this.textures.addCanvas('spark_particle', canvas);
     }
+
+    // Preload high-res 2D Slime visual assets
+    this.load.image('slime_action_splash', 'assets/slime/slime_action_splash.jpg');
+    this.load.image('slime_phenotypes', 'assets/slime/slime_phenotypes.jpg');
+    this.load.image('slime_organelles_kit', 'assets/slime/slime_organelles_kit.jpg');
+    this.load.image('slime_sprite_sheet', 'assets/slime/slime_sprite_sheet.jpg');
   }
 
   public create(): void {

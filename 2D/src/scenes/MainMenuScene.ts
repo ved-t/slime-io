@@ -20,6 +20,7 @@ export class MainMenuScene extends Phaser.Scene {
   private telemetryThemeText?: Phaser.GameObjects.Text;
   private audioToggleText?: Phaser.GameObjects.Text;
   private audioToggleContainer?: Phaser.GameObjects.Container;
+  private archiveModal?: Phaser.GameObjects.Container;
 
   constructor() {
     super({ key: 'MainMenuScene' });
@@ -74,6 +75,9 @@ export class MainMenuScene extends Phaser.Scene {
 
     // 7. Game Mode Launch Buttons (Depth 20)
     this.createGameModeButtons(width);
+
+    // 7.5. Bio-Archive Modal Launch Button (Depth 20)
+    this.createArchiveButton(width);
 
     // 8. Footer Controls & Interactive Feeding Hint (Depth 20)
     const hintText = this.add.text(width / 2, 655, '💡 CLICK EMPTY CHAMBER TO DROP BIO-NUTRIENTS & LURE SPECIMEN', {
@@ -407,5 +411,295 @@ export class MainMenuScene extends Phaser.Scene {
 
   public destroy(): void {
     this.simulation?.destroy();
+  }
+
+  // ==========================================
+  // BIO-ARCHIVE 2D ASSET VIEWER MODAL
+  // ==========================================
+  private createArchiveButton(width: number): void {
+    const btn = this.add.container(width - 130, 48).setDepth(20);
+    const bg = this.add.graphics();
+    bg.fillStyle(0x0f2238, 0.88);
+    bg.fillRoundedRect(-100, -18, 200, 36, 18);
+    bg.lineStyle(1.5, 0x38bdf8, 0.9);
+    bg.strokeRoundedRect(-100, -18, 200, 36, 18);
+    btn.add(bg);
+
+    const text = this.add.text(0, 0, '🔬 2D BIO-ARCHIVE', {
+      fontFamily: 'Orbitron, monospace',
+      fontSize: '11px',
+      color: '#38bdf8',
+      fontStyle: 'bold'
+    }).setOrigin(0.5);
+    btn.add(text);
+
+    btn.setSize(200, 36);
+    btn.setInteractive({ useHandCursor: true });
+    btn.on('pointerdown', (pointer: Phaser.Input.Pointer, localX: number, localY: number, event: Phaser.Types.Input.EventData) => {
+      event.stopPropagation();
+      this.audio.init();
+      this.audio.playUIClick();
+      this.openArchiveModal(width, 720);
+    });
+
+    btn.on('pointerover', () => {
+      this.tweens.add({ targets: btn, scaleX: 1.05, scaleY: 1.05, duration: 120 });
+    });
+    btn.on('pointerout', () => {
+      this.tweens.add({ targets: btn, scaleX: 1.0, scaleY: 1.0, duration: 120 });
+    });
+  }
+
+  private openArchiveModal(width: number, height: number): void {
+    if (this.archiveModal) {
+      this.archiveModal.destroy();
+    }
+
+    const modal = this.add.container(0, 0).setDepth(100);
+    this.archiveModal = modal;
+
+    // Dark backdrop overlay (blocks background interaction)
+    const overlay = this.add.graphics();
+    overlay.fillStyle(0x020617, 0.9);
+    overlay.fillRect(0, 0, width, height);
+    modal.add(overlay);
+
+    overlay.setInteractive(new Phaser.Geom.Rectangle(0, 0, width, height), Phaser.Geom.Rectangle.Contains);
+    overlay.on('pointerdown', (p: any, lx: any, ly: any, event: Phaser.Types.Input.EventData) => {
+      event.stopPropagation();
+    });
+
+    // Modal main panel
+    const panelW = 1060;
+    const panelH = 590;
+    const panelX = width / 2;
+    const panelY = height / 2;
+
+    const panel = this.add.graphics();
+    panel.fillStyle(0x0a1424, 0.96);
+    panel.fillRoundedRect(panelX - panelW / 2, panelY - panelH / 2, panelW, panelH, 16);
+    panel.lineStyle(2, 0x38bdf8, 0.85);
+    panel.strokeRoundedRect(panelX - panelW / 2, panelY - panelH / 2, panelW, panelH, 16);
+    modal.add(panel);
+
+    // Modal Header Title
+    const title = this.add.text(panelX - panelW / 2 + 36, panelY - panelH / 2 + 28, '🧬 SPECIMEN ARCHIVE // 2D VISUAL ASSETS', {
+      fontFamily: 'Orbitron, monospace',
+      fontSize: '20px',
+      color: '#34d399',
+      fontStyle: 'bold'
+    }).setOrigin(0, 0.5);
+    modal.add(title);
+
+    const sub = this.add.text(panelX - panelW / 2 + 36, panelY - panelH / 2 + 52, 'PHASER 3 TEXTURE ENGINE VIEWER // HIGH-RES 1024x1024 2D ASSET DATABASE', {
+      fontFamily: 'Rajdhani, sans-serif',
+      fontSize: '13px',
+      color: '#94a3b8',
+      letterSpacing: 2
+    }).setOrigin(0, 0.5);
+    modal.add(sub);
+
+    // Close button
+    const closeBtn = this.add.container(panelX + panelW / 2 - 45, panelY - panelH / 2 + 38);
+    const closeBg = this.add.graphics();
+    closeBg.fillStyle(0xef4444, 0.2);
+    closeBg.fillRoundedRect(-24, -16, 48, 32, 6);
+    closeBg.lineStyle(1.5, 0xef4444, 0.8);
+    closeBg.strokeRoundedRect(-24, -16, 48, 32, 6);
+    closeBtn.add(closeBg);
+    const closeText = this.add.text(0, 0, '✕', {
+      fontFamily: 'Orbitron, monospace',
+      fontSize: '16px',
+      color: '#ef4444',
+      fontStyle: 'bold'
+    }).setOrigin(0.5);
+    closeBtn.add(closeText);
+    closeBtn.setSize(48, 32);
+    closeBtn.setInteractive({ useHandCursor: true });
+    closeBtn.on('pointerdown', (p: any, lx: any, ly: any, event: Phaser.Types.Input.EventData) => {
+      event.stopPropagation();
+      this.audio.playUIClick();
+      modal.destroy();
+      this.archiveModal = undefined;
+    });
+    modal.add(closeBtn);
+
+    // Assets definition
+    const assetTabs = [
+      {
+        id: 'action_splash',
+        key: 'slime_action_splash',
+        tabLabel: '💥 KEY ART (BREACH)',
+        title: 'SPECIMEN BREACH // ACTION SPLASH ART',
+        desc: 'High-impact key art & game cover asset depicting the Xenomorphic Slime shattering its containment cylinder amidst emergency biohazard alarms and escaping into the research facility.',
+        details: [
+          '• Resolution: 1024 × 1024 (Cinematic RGB)',
+          '• Use Cases: Game Cover, App Icon, Game Over & Victory backdrops',
+          '• Elements: Shattered acrylic tube, hazard tape, toxic droplets, glowing core'
+        ]
+      },
+      {
+        id: 'phenotypes',
+        key: 'slime_phenotypes',
+        tabLabel: '🧬 4 PHENOTYPES (2×2)',
+        title: 'SPECIMEN PHENOTYPE MATRIX (THEMES.TS)',
+        desc: '2×2 presentation showcasing the four genetic specimen phenotypes configured in Themes.ts with their dedicated color signatures, sensory slit eyes, and energy cores.',
+        details: [
+          '• SPECIMEN-01 ACID BIO: Neon emerald green, amber slit eyes, acid vesicles',
+          '• SPECIMEN-02 COSMIC VOID: Deep purple nebula slime, luminous cyan eyes',
+          '• SPECIMEN-03 CYBER PLASMA: Electric cyan plasma, ruby sensory eyes',
+          '• SPECIMEN-04 ELDRITCH CRIMSON: Sanguine red flesh, emerald jade eyes'
+        ]
+      },
+      {
+        id: 'organelles',
+        key: 'slime_organelles_kit',
+        tabLabel: '🔬 ANATOMY & VFX KIT',
+        title: 'MODULAR ORGANELLE & VFX SPRITE KIT',
+        desc: 'Component sprite sheet for assembling dynamic in-game soft-body anatomy, sensory states, and corrosive particle effects.',
+        details: [
+          '• Nuclei: 4 Glowing bioluminescent energy cores',
+          '• Alien Eyes: Open, scanning, narrow hunting slit, dilated, and blink frames',
+          '• VFX: Boiling caustic bubbles, acid splash droplets, slime decals, and stinger spikes'
+        ]
+      },
+      {
+        id: 'spritesheet',
+        key: 'slime_sprite_sheet',
+        tabLabel: '🎞️ SPRITE SHEET',
+        title: '2D ANIMATION SPRITE SHEET (6 CYCLES)',
+        desc: 'Game-ready frame matrix covering the core behavioral states of the Xenomorphic Slime for top-down gameplay.',
+        details: [
+          '• Row 1: Idle pulsating gelatinous jiggle & wobble cycle',
+          '• Rows 2 & 3: Crawling squish-and-stretch locomotion cycle',
+          '• Row 4: Acid pseudopod stinger lunging & piercing spike strike',
+          '• Row 5: Amoebic feeding jaws engulfing biomass',
+          '• Row 6: Cellular mitosis division into twin daughter cells'
+        ]
+      }
+    ];
+
+    let selectedTabIdx = 0;
+
+    // Viewport image container
+    const imgX = panelX - 220;
+    const imgY = panelY + 45;
+    const imgBorder = this.add.graphics();
+    imgBorder.fillStyle(0x050c18, 1);
+    imgBorder.fillRoundedRect(imgX - 225, imgY - 225, 450, 450, 10);
+    imgBorder.lineStyle(1.5, 0x1e3a5f, 0.8);
+    imgBorder.strokeRoundedRect(imgX - 225, imgY - 225, 450, 450, 10);
+    modal.add(imgBorder);
+
+    const assetImg = this.add.image(imgX, imgY, assetTabs[0].key);
+    assetImg.setDisplaySize(440, 440);
+    modal.add(assetImg);
+
+    // Side information panel
+    const infoX = panelX + 30;
+    const infoY = panelY - 165;
+
+    const infoTitle = this.add.text(infoX, infoY, assetTabs[0].title, {
+      fontFamily: 'Orbitron, monospace',
+      fontSize: '16px',
+      color: '#38bdf8',
+      fontStyle: 'bold',
+      wordWrap: { width: 440 }
+    });
+    modal.add(infoTitle);
+
+    const infoDesc = this.add.text(infoX, infoY + 50, assetTabs[0].desc, {
+      fontFamily: 'Rajdhani, sans-serif',
+      fontSize: '15px',
+      color: '#cbd5e1',
+      wordWrap: { width: 440 },
+      lineSpacing: 4
+    });
+    modal.add(infoDesc);
+
+    const infoDetails = this.add.text(infoX, infoY + 140, assetTabs[0].details.join('\n\n'), {
+      fontFamily: 'Rajdhani, sans-serif',
+      fontSize: '14px',
+      color: '#94a3b8',
+      wordWrap: { width: 440 },
+      lineSpacing: 2
+    });
+    modal.add(infoDetails);
+
+    const badge = this.add.text(infoX, infoY + 360, 'STATUS: PHASER TEXTURE REGISTERED & LOADED (READY)', {
+      fontFamily: 'Orbitron, monospace',
+      fontSize: '11px',
+      color: '#34d399',
+      backgroundColor: '#052e16',
+      padding: { x: 8, y: 5 }
+    });
+    modal.add(badge);
+
+    // Tab buttons along top of viewport
+    const tabY = panelY - panelH / 2 + 90;
+    const tabWidth = 230;
+    const tabButtons: Phaser.GameObjects.Container[] = [];
+
+    const updateTabs = () => {
+      tabButtons.forEach((btnContainer, idx) => {
+        const bgGfx = btnContainer.getAt(0) as Phaser.GameObjects.Graphics;
+        const txt = btnContainer.getAt(1) as Phaser.GameObjects.Text;
+        const isSelected = idx === selectedTabIdx;
+
+        bgGfx.clear();
+        bgGfx.fillStyle(isSelected ? 0x0284c7 : 0x0f2238, isSelected ? 0.95 : 0.6);
+        bgGfx.fillRoundedRect(-tabWidth / 2 + 5, -16, tabWidth - 10, 32, 6);
+        bgGfx.lineStyle(1.5, isSelected ? 0x38bdf8 : 0x1e3a5f, 0.8);
+        bgGfx.strokeRoundedRect(-tabWidth / 2 + 5, -16, tabWidth - 10, 32, 6);
+
+        txt.setColor(isSelected ? '#ffffff' : '#94a3b8');
+      });
+
+      const current = assetTabs[selectedTabIdx];
+      assetImg.setTexture(current.key);
+      assetImg.setDisplaySize(440, 440);
+      infoTitle.setText(current.title);
+      infoDesc.setText(current.desc);
+      infoDetails.setText(current.details.join('\n\n'));
+    };
+
+    assetTabs.forEach((tab, idx) => {
+      const tabX = panelX - panelW / 2 + 36 + tabWidth / 2 + idx * (tabWidth + 10);
+      const tabContainer = this.add.container(tabX, tabY);
+
+      const tabBg = this.add.graphics();
+      tabContainer.add(tabBg);
+
+      const tabText = this.add.text(0, 0, tab.tabLabel, {
+        fontFamily: 'Orbitron, monospace',
+        fontSize: '11px',
+        color: '#ffffff',
+        fontStyle: 'bold'
+      }).setOrigin(0.5);
+      tabContainer.add(tabText);
+
+      tabContainer.setSize(tabWidth - 10, 32);
+      tabContainer.setInteractive({ useHandCursor: true });
+      tabContainer.on('pointerdown', (p: any, lx: any, ly: any, event: Phaser.Types.Input.EventData) => {
+        event.stopPropagation();
+        this.audio.playUIClick();
+        selectedTabIdx = idx;
+        updateTabs();
+      });
+
+      modal.add(tabContainer);
+      tabButtons.push(tabContainer);
+    });
+
+    updateTabs();
+
+    // Intro entrance animation
+    modal.setAlpha(0);
+    this.tweens.add({
+      targets: modal,
+      alpha: 1,
+      duration: 180,
+      ease: 'Power2'
+    });
   }
 }

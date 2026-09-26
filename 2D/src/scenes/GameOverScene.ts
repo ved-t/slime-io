@@ -30,6 +30,14 @@ export class GameOverScene extends Phaser.Scene {
     bg.fillStyle(0x0a0507, 1);
     bg.fillRect(0, 0, width, height);
 
+    // Cinematic Biohazard Background Art
+    if (this.textures.exists('slime_action_splash')) {
+      const splash = this.add.image(width / 2, height / 2, 'slime_action_splash');
+      splash.setDisplaySize(width, height);
+      splash.setAlpha(0.18);
+      splash.setTint(0xef4444);
+    }
+
     // Hazard Red Grid
     bg.lineStyle(1, 0xef4444, 0.2);
     for (let x = 0; x < width; x += 50) bg.lineBetween(x, 0, x, height);

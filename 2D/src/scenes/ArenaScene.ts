@@ -634,7 +634,6 @@ export class ArenaScene extends Phaser.Scene {
     }).setOrigin(0.5);
     respawnBtn.add(rText);
 
-    respawnBtn.setScrollFactor(0);
     respawnBtn.setSize(240, 40);
     respawnBtn.setInteractive({ useHandCursor: true });
     respawnBtn.on('pointerdown', () => {
@@ -663,7 +662,6 @@ export class ArenaScene extends Phaser.Scene {
     }).setOrigin(0.5);
     exitBtn.add(eText);
 
-    exitBtn.setScrollFactor(0);
     exitBtn.setSize(240, 36);
     exitBtn.setInteractive({ useHandCursor: true });
     exitBtn.on('pointerdown', () => {
@@ -729,7 +727,6 @@ export class ArenaScene extends Phaser.Scene {
     }).setOrigin(0.5);
     controlBtn.add(cText);
 
-    controlBtn.setScrollFactor(0);
     controlBtn.setSize(320, 40);
     controlBtn.setInteractive({ useHandCursor: true });
     controlBtn.on('pointerdown', () => {
@@ -773,7 +770,6 @@ export class ArenaScene extends Phaser.Scene {
     }).setOrigin(0.5);
     resumeBtn.add(rText);
 
-    resumeBtn.setScrollFactor(0);
     resumeBtn.setSize(240, 40);
     resumeBtn.setInteractive({ useHandCursor: true });
     resumeBtn.on('pointerdown', () => {
@@ -799,7 +795,6 @@ export class ArenaScene extends Phaser.Scene {
     }).setOrigin(0.5);
     quitBtn.add(eText);
 
-    quitBtn.setScrollFactor(0);
     quitBtn.setSize(240, 36);
     quitBtn.setInteractive({ useHandCursor: true });
     quitBtn.on('pointerdown', () => {

@@ -1,5 +1,5 @@
 import { SlimeOrganism } from '../../entities/slime/SlimeOrganism';
-import { Pellet } from '../../entities/combat/BiomassPelletManager';
+import { Pellet, BiomassPelletManager } from '../../entities/combat/BiomassPelletManager';
 
 export type BotPersonality = 'glutton' | 'hunter' | 'striker' | 'scavenger';
 
@@ -48,10 +48,12 @@ export class AISlimeBot {
 
     this.currentAngle = Math.random() * Math.PI * 2;
     this.targetAngle = this.currentAngle;
+    // Stagger sensor sweeps so all bots don't evaluate on the same frame
+    this.decisionTimer = Math.floor(Math.random() * this.decisionInterval);
   }
 
   public update(
-    pellets: Pellet[],
+    pellets: BiomassPelletManager,
     allSlimes: SlimeOrganism[],
     arenaCenterX: number,
     arenaCenterY: number,
@@ -90,7 +92,7 @@ export class AISlimeBot {
   }
 
   private evaluateSensors(
-    pellets: Pellet[],
+    pellets: BiomassPelletManager,
     allSlimes: SlimeOrganism[],
     arenaCenterX: number,
     arenaCenterY: number,
@@ -116,18 +118,23 @@ export class AISlimeBot {
     // 2. Threat Avoidance (Large predatory slimes nearby)
     let nearestThreat: SlimeOrganism | null = null;
     let minThreatDist = 240;
+    let minThreatDistSq = minThreatDist * minThreatDist;
 
     for (const rival of allSlimes) {
       if (rival.id === this.slime.id) continue;
-      const d = Math.hypot(rival.x - this.slime.x, rival.y - this.slime.y);
+      const rdx = rival.x - this.slime.x;
+      const rdy = rival.y - this.slime.y;
+      const dSq = rdx * rdx + rdy * rdy;
+      if (dSq >= minThreatDistSq) continue;
 
       // A slime is a threat if it's larger OR currently spiking towards us
       const isDangerous = (rival.mass > this.slime.mass * 1.2) || rival.isBoosting || rival.isLunging;
-      if (isDangerous && d < minThreatDist) {
-        minThreatDist = d;
+      if (isDangerous) {
+        minThreatDistSq = dSq;
         nearestThreat = rival;
       }
     }
+    minThreatDist = Math.sqrt(minThreatDistSq);
 
     if (nearestThreat) {
       // Steer away from threat
@@ -184,21 +191,27 @@ export class AISlimeBot {
 
     // 4. Foraging & Scavenging Food Pellets
     let bestPellet: Pellet | null = null;
-    let minPelletDist = 320;
+    let minPelletDistSq = 320 * 320;
+    const sx = this.slime.x;
+    const sy = this.slime.y;
 
-    for (const p of pellets) {
-      const d = Math.hypot(p.x - this.slime.x, p.y - this.slime.y);
-      // High-value burst orbs have priority
-      const effectiveDist = p.isBurstOrb ? d * 0.45 : d;
-      if (effectiveDist < minPelletDist) {
-        minPelletDist = effectiveDist;
+    // Burst orbs count at 0.45x distance, so they can win from up to 320 / 0.45 away
+    pellets.forEachNear(sx, sy, 320 / 0.45, (p) => {
+      const pdx = p.x - sx;
+      const pdy = p.y - sy;
+      // High-value burst orbs have priority (0.45x effective distance -> 0.2025x squared)
+      const effectiveDistSq = (pdx * pdx + pdy * pdy) * (p.isBurstOrb ? 0.2025 : 1);
+      if (effectiveDistSq < minPelletDistSq) {
+        minPelletDistSq = effectiveDistSq;
         bestPellet = p;
       }
-    }
+    });
+    const found = bestPellet as Pellet | null;
+    const minPelletDist = Math.sqrt(minPelletDistSq);
 
-    if (bestPellet) {
-      this.targetAngle = Math.atan2(bestPellet.y - this.slime.y, bestPellet.x - this.slime.x);
-      if (bestPellet.isBurstOrb && minPelletDist < 160 && this.boostCooldown === 0 && Math.random() < 0.4) {
+    if (found) {
+      this.targetAngle = Math.atan2(found.y - this.slime.y, found.x - this.slime.x);
+      if (found.isBurstOrb && minPelletDist < 160 && this.boostCooldown === 0 && Math.random() < 0.4) {
         this.triggerBoost(20);
       }
       return;

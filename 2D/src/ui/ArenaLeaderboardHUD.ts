@@ -22,6 +22,8 @@ export class ArenaLeaderboardHUD {
   private killFeedText: Phaser.GameObjects.Text;
   private killFeedTimer: number = 0;
   private activeAlertKind: AlertKind = 'generic';
+  private refreshCounter: number = 0;
+  private sortScratch: SlimeOrganism[] = [];
 
   // Bottom Telemetry Bar
   private telemetryContainer: Phaser.GameObjects.Container;
@@ -154,8 +156,14 @@ export class ArenaLeaderboardHUD {
       }
     }
 
+    // Text changes re-rasterize a canvas + re-upload a texture, so refresh stats at ~5 Hz only.
+    if (this.refreshCounter++ % 12 !== 0) return;
+
     // Sort leaderboard by mass descending
-    const sorted = [...allSlimes].sort((a, b) => b.mass - a.mass);
+    const sorted = this.sortScratch;
+    sorted.length = 0;
+    for (const s of allSlimes) sorted.push(s);
+    sorted.sort((a, b) => b.mass - a.mass);
 
     let playerRank = -1;
     for (let i = 0; i < sorted.length; i++) {
@@ -174,35 +182,46 @@ export class ArenaLeaderboardHUD {
         const displayName = isPlayer ? `YOU (${s.name})` : s.name;
         const massStr = `${s.mass.toLocaleString()} μg`;
 
-        this.entryTexts[i].setText(`${prefix}${displayName.substring(0, 11)} - ${massStr}`);
-        this.entryTexts[i].setColor(isPlayer ? '#34d399' : (i === 0 ? '#facc15' : '#cbd5e1'));
-        this.entryTexts[i].setFontStyle(isPlayer || i === 0 ? 'bold' : 'normal');
+        const t = this.entryTexts[i];
+        this.setTextIfChanged(t, `${prefix}${displayName.substring(0, 11)} - ${massStr}`);
+        const color = isPlayer ? '#34d399' : (i === 0 ? '#facc15' : '#cbd5e1');
+        if (t.style.color !== color) t.setColor(color);
+        const fontStyle = isPlayer || i === 0 ? 'bold' : 'normal';
+        if (t.style.fontStyle !== fontStyle) t.setFontStyle(fontStyle);
       } else {
-        this.entryTexts[i].setText('');
+        this.setTextIfChanged(this.entryTexts[i], '');
       }
     }
 
     // Player rank footer if outside top 10
     if (playerRank > 10) {
-      this.playerRankText.setText(`YOUR RANK: #${playerRank} - ${player.mass.toLocaleString()} μg`);
+      this.setTextIfChanged(this.playerRankText, `YOUR RANK: #${playerRank} - ${player.mass.toLocaleString()} μg`);
     } else {
-      this.playerRankText.setText(`YOUR RANK: #${playerRank} (TOP 10!)`);
+      this.setTextIfChanged(this.playerRankText, `YOUR RANK: #${playerRank} (TOP 10!)`);
     }
 
     // Update bottom telemetry
-    this.massText.setText(`MASS: ${player.mass.toLocaleString()} μg`);
-    this.killsText.setText(`KILLS: ${player.kills}`);
+    this.setTextIfChanged(this.massText, `MASS: ${player.mass.toLocaleString()} μg`);
+    this.setTextIfChanged(this.killsText, `KILLS: ${player.kills}`);
 
+    let prompt: string;
+    let promptColor: string;
     if (player.isBoosting) {
-      this.boostPromptText.setText('🔥 BOOST ACTIVE // SHEDDING MASS');
-      this.boostPromptText.setColor('#f43f5e');
+      prompt = '🔥 BOOST ACTIVE // SHEDDING MASS';
+      promptColor = '#f43f5e';
     } else if (player.radius <= 28) {
-      this.boostPromptText.setText('⚠️ MASS DEPLETED // EAT TO BOOST');
-      this.boostPromptText.setColor('#94a3b8');
+      prompt = '⚠️ MASS DEPLETED // EAT TO BOOST';
+      promptColor = '#94a3b8';
     } else {
-      this.boostPromptText.setText('⚡ [SPACE / R-CLICK] JET BOOST');
-      this.boostPromptText.setColor('#38bdf8');
+      prompt = '⚡ [SPACE / R-CLICK] JET BOOST';
+      promptColor = '#38bdf8';
     }
+    this.setTextIfChanged(this.boostPromptText, prompt);
+    if (this.boostPromptText.style.color !== promptColor) this.boostPromptText.setColor(promptColor);
+  }
+
+  private setTextIfChanged(text: Phaser.GameObjects.Text, value: string): void {
+    if (text.text !== value) text.setText(value);
   }
 
   public destroy(): void {

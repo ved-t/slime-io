@@ -7,6 +7,7 @@ export class ArenaRadar {
   private cx: number = 1280 - 85;
   private cy: number = 720 - 85;
   private radarRadius: number = 65;
+  private frameCounter: number = 0;
 
   private arenaCenterX: number;
   private arenaCenterY: number;
@@ -29,6 +30,8 @@ export class ArenaRadar {
   }
 
   public render(player: SlimeOrganism, slimes: SlimeOrganism[], pellets: Pellet[]): void {
+    // ~20 Hz is plenty for a minimap
+    if (this.frameCounter++ % 3 !== 0) return;
     this.graphics.clear();
 
     const scale = this.radarRadius / this.arenaRadius;

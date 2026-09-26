@@ -56,7 +56,11 @@ interface ChainNode {
 
 export class ToxicTrailManager {
   private scene: Phaser.Scene;
-  private renderers: Map<string, OwnerTrailRenderer> = new Map();
+  // ONE shared mask/border/body set for every owner (was one set + stencil mask per owner, which
+  // flushed the WebGL batch per owner). The shared inverted core mask also merges overlapping
+  // trails into a single pool with one outer outline.
+  private renderer: OwnerTrailRenderer;
+  private ownerGroups: Map<string, TrailPoint[]> = new Map();
   public trailPoints: TrailPoint[] = [];
   private lastDropPositions: Map<string, { x: number; y: number }> = new Map();
 
@@ -73,6 +77,23 @@ export class ToxicTrailManager {
 
   constructor(scene: Phaser.Scene, private onConvertToFood?: (x: number, y: number, color: number, value: number) => void) {
     this.scene = scene;
+
+    // 1. Mask Graphics: writes core geometry to the stencil buffer (not added to scene display list)
+    const maskGraphics = new Phaser.GameObjects.Graphics(scene);
+    const mask = maskGraphics.createGeometryMask();
+    // Invert mask: only pixels OUTSIDE the core geometry are rendered by borderGraphics
+    mask.setInvertAlpha(true);
+
+    // 2. Border Graphics: renders dilated yellow shape, clipped by stencil mask to outer perimeter only
+    const borderGraphics = scene.add.graphics();
+    borderGraphics.setDepth(6.0);
+    borderGraphics.setMask(mask);
+
+    // 3. Body Graphics: renders fluid viscous body, caustic spine, and bubbles
+    const bodyGraphics = scene.add.graphics();
+    bodyGraphics.setDepth(6.1);
+
+    this.renderer = { borderGraphics, maskGraphics, bodyGraphics, mask };
   }
 
   public registerSlime(slime: SlimeOrganism): void {
@@ -159,73 +180,30 @@ export class ToxicTrailManager {
   }
 
   private render(): void {
-    if (this.trailPoints.length === 0) {
-      // Clean up any existing renderers when no points exist
-      for (const renderer of this.renderers.values()) {
-        renderer.borderGraphics.destroy();
-        renderer.maskGraphics.destroy();
-        renderer.bodyGraphics.destroy();
-        renderer.mask.destroy();
-      }
-      this.renderers.clear();
-      return;
-    }
+    const renderer = this.renderer;
+    renderer.borderGraphics.clear();
+    renderer.maskGraphics.clear();
+    renderer.bodyGraphics.clear();
+    if (this.trailPoints.length === 0) return;
 
     const now = performance.now() * 0.005;
 
-    // Group points by owner to render continuous ribbons per organism
-    const ownerPoints: Map<string, TrailPoint[]> = new Map();
+    // Group points by owner to render continuous ribbons per organism (reused lists)
+    for (const list of this.ownerGroups.values()) list.length = 0;
     for (const pt of this.trailPoints) {
-      let list = ownerPoints.get(pt.ownerId);
+      let list = this.ownerGroups.get(pt.ownerId);
       if (!list) {
         list = [];
-        ownerPoints.set(pt.ownerId, list);
+        this.ownerGroups.set(pt.ownerId, list);
       }
       list.push(pt);
     }
 
-    const activeOwnerIds = new Set<string>(ownerPoints.keys());
-
-    // Clean up renderers for owners whose trails have completely expired
-    for (const [ownerId, renderer] of this.renderers) {
-      if (!activeOwnerIds.has(ownerId)) {
-        renderer.borderGraphics.destroy();
-        renderer.maskGraphics.destroy();
-        renderer.bodyGraphics.destroy();
-        renderer.mask.destroy();
-        this.renderers.delete(ownerId);
+    for (const [ownerId, points] of this.ownerGroups) {
+      if (points.length === 0) {
+        this.ownerGroups.delete(ownerId);
+        continue;
       }
-    }
-
-    // Render each owner's trail using Stencil Inverted Masking
-    for (const [ownerId, points] of ownerPoints) {
-      if (points.length === 0) continue;
-
-      let renderer = this.renderers.get(ownerId);
-      if (!renderer) {
-        // 1. Mask Graphics: writes core geometry to OpenGL Stencil Buffer (not added to scene display list)
-        const maskGraphics = new Phaser.GameObjects.Graphics(this.scene);
-        const mask = maskGraphics.createGeometryMask();
-        // Invert mask: only pixels OUTSIDE the core geometry are rendered by borderGraphics
-        mask.setInvertAlpha(true);
-
-        // 2. Border Graphics: renders dilated yellow shape, clipped by stencil mask to outer perimeter only
-        const borderGraphics = this.scene.add.graphics();
-        borderGraphics.setDepth(6.0);
-        borderGraphics.setMask(mask);
-
-        // 3. Body Graphics: renders fluid viscous body, caustic spine, and bubbles
-        const bodyGraphics = this.scene.add.graphics();
-        bodyGraphics.setDepth(6.1);
-
-        renderer = { borderGraphics, maskGraphics, bodyGraphics, mask };
-        this.renderers.set(ownerId, renderer);
-      }
-
-      renderer.borderGraphics.clear();
-      renderer.maskGraphics.clear();
-      renderer.bodyGraphics.clear();
-
       this.renderOwnerTrails(renderer, points, now);
     }
   }
@@ -254,8 +232,21 @@ export class ToxicTrailManager {
       chains.push(currentChain);
     }
 
-    // 2. Render each chain into mask, border, and body passes
+    // 2. Render each on-screen chain into mask, border, and body passes
+    const view = this.scene.cameras.main.worldView;
     for (const chain of chains) {
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity, maxR = 0;
+      for (const pt of chain) {
+        if (pt.x < minX) minX = pt.x;
+        if (pt.x > maxX) maxX = pt.x;
+        if (pt.y < minY) minY = pt.y;
+        if (pt.y > maxY) maxY = pt.y;
+        if (pt.radius > maxR) maxR = pt.radius;
+      }
+      const pad = maxR + this.BORDER_WIDTH + 4;
+      if (maxX + pad < view.x || minX - pad > view.right || maxY + pad < view.y || minY - pad > view.bottom) {
+        continue;
+      }
       this.renderChain(renderer, chain, now);
     }
   }
@@ -638,11 +629,12 @@ export class ToxicTrailManager {
    * Slimes are immune to their own poison trails; only other slimes' trails deal damage.
    */
   public checkSlimeExposure(slime: SlimeOrganism): TrailExposure {
-    const frontNodes = slime.getFrontNodes();
-    const testPoints = [
-      { x: slime.x, y: slime.y },
-      ...frontNodes.map(n => ({ x: n.x, y: n.y }))
-    ];
+    // Test the center plus the front-facing membrane nodes (same set as getFrontNodes()),
+    // iterated in place to avoid per-frame allocations.
+    const nodes = slime.nodes;
+    const moveAngle = slime.lastMoveAngle;
+    // Membrane can stretch well past radius while boosting; generous reach for the broad-phase reject.
+    const reach = slime.radius * 2.2;
 
     for (const pt of this.trailPoints) {
       // Slimes are completely immune to their own poison trails
@@ -657,17 +649,30 @@ export class ToxicTrailManager {
       const collRadius = pt.radius * 1.15;
       const collRadiusSq = collRadius * collRadius;
 
-      for (const tp of testPoints) {
-        const dx = tp.x - pt.x;
-        const dy = tp.y - pt.y;
-        if (dx * dx + dy * dy < collRadiusSq) {
-          return {
-            inTrail: true,
-            intensity: this.computePoisonIntensity(pt),
-            pointRadius: pt.radius,
-            killerId: pt.ownerId
-          };
-        }
+      // Broad phase: skip points far outside the slime's reach
+      const cdx = slime.x - pt.x;
+      const cdy = slime.y - pt.y;
+      const broad = reach + collRadius;
+      if (cdx * cdx + cdy * cdy > broad * broad) {
+        continue;
+      }
+
+      let hit = cdx * cdx + cdy * cdy < collRadiusSq;
+      for (let i = 0; !hit && i < nodes.length; i++) {
+        const n = nodes[i];
+        if (Math.cos(n.targetAngle - moveAngle) <= 0.4) continue;
+        const dx = n.x - pt.x;
+        const dy = n.y - pt.y;
+        hit = dx * dx + dy * dy < collRadiusSq;
+      }
+
+      if (hit) {
+        return {
+          inTrail: true,
+          intensity: this.computePoisonIntensity(pt),
+          pointRadius: pt.radius,
+          killerId: pt.ownerId
+        };
       }
     }
 
@@ -676,24 +681,16 @@ export class ToxicTrailManager {
 
   public clearOwner(ownerId: string): void {
     this.lastDropPositions.delete(ownerId);
-    const renderer = this.renderers.get(ownerId);
-    if (renderer) {
-      renderer.borderGraphics.destroy();
-      renderer.maskGraphics.destroy();
-      renderer.bodyGraphics.destroy();
-      renderer.mask.destroy();
-      this.renderers.delete(ownerId);
-    }
   }
 
   public destroy(): void {
-    for (const renderer of this.renderers.values()) {
-      renderer.borderGraphics.destroy();
-      renderer.maskGraphics.destroy();
-      renderer.bodyGraphics.destroy();
-      renderer.mask.destroy();
-    }
-    this.renderers.clear();
+    const r = this.renderer;
+    r.borderGraphics.clearMask();
+    r.mask.destroy();
+    r.maskGraphics.destroy();
+    r.borderGraphics.destroy();
+    r.bodyGraphics.destroy();
+    this.ownerGroups.clear();
     this.trailPoints = [];
     this.lastDropPositions.clear();
   }

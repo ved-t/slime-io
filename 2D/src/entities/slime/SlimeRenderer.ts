@@ -15,10 +15,17 @@ export interface SlimeNode {
 
 export class SlimeRenderer {
   private graphics: Phaser.GameObjects.Graphics;
+  private camera: Phaser.Cameras.Scene2D.Camera;
+
+  // Reused per-frame buffers: the smoothed contour is built once and drawn 3x (glow/fill/membrane).
+  private contour: Phaser.Math.Vector2[] = [];
+  private contourLen: number = 0;
+  private jitterScratch: SlimeNode[] = [];
 
   constructor(scene: Phaser.Scene) {
     this.graphics = scene.add.graphics();
     this.graphics.setDepth(15);
+    this.camera = scene.cameras.main;
   }
 
   public getGraphics(): Phaser.GameObjects.Graphics {
@@ -47,6 +54,14 @@ export class SlimeRenderer {
     this.graphics.clear();
     if (nodes.length < 3) return;
 
+    // Off-screen cull: skip all drawing (physics still runs in SlimeOrganism).
+    // Pad generously for membrane stretch, stinger and glow stroke.
+    const view = this.camera.worldView;
+    const pad = radius * 2 + 16;
+    if (coreX + pad < view.x || coreX - pad > view.right || coreY + pad < view.y || coreY - pad > view.bottom) {
+      return;
+    }
+
     const n = nodes.length;
 
     // Poison-trail edge vibration: jitters the membrane contour into a waveform pattern
@@ -60,21 +75,23 @@ export class SlimeRenderer {
     if (isCorroding) {
       glowColor = (Math.floor(performance.now() / 80) % 2 === 0) ? 0xef4444 : 0xfacc15;
     }
+    // LOD: fewer curve subdivisions when the slime is small on screen
+    const screenRadius = radius * this.camera.zoom;
+    const steps = screenRadius < 30 ? 2 : (screenRadius < 60 ? 3 : 4);
+    const contour = this.buildSmoothContour(contourNodes, steps);
+
     this.graphics.lineStyle(isBoosting || isCorroding ? 12 : 8, glowColor, (isBoosting ? 0.38 : (isCorroding ? 0.35 + 0.35 * corrosionSeverity : 0.22)) * alpha);
-    this.drawSmoothContour(contourNodes);
-    this.graphics.strokePath();
+    this.graphics.strokePoints(contour, true, true, this.contourLen);
 
     // 2. Main Fluid Body Fill & Inner Membrane
     const bodyColor = isFrozen ? 0x60a5fa : theme.bodyInner;
     this.graphics.fillStyle(bodyColor, (isFrozen ? 0.6 : 0.42) * alpha);
-    this.drawSmoothContour(contourNodes);
-    this.graphics.fillPath();
+    this.graphics.fillPoints(contour, true, true, this.contourLen);
 
     // 3. Crisp Membrane Perimeter Edge
     const membraneColor = isFrozen ? 0xdbeafe : (isCorroding ? 0xfacc15 : theme.membrane);
     this.graphics.lineStyle(isBoosting ? 4.5 : 3.5, membraneColor, 0.95 * alpha);
-    this.drawSmoothContour(contourNodes);
-    this.graphics.strokePath();
+    this.graphics.strokePoints(contour, true, true, this.contourLen);
 
     // 3.2. Sizzling Caustic Bubbles along Membrane (When Corroding in Acid)
     if (isCorroding && !isFrozen) {
@@ -212,30 +229,35 @@ export class SlimeRenderer {
   private jitterNodesForCorrosion(nodes: SlimeNode[], severity: number): SlimeNode[] {
     const now = performance.now() * 0.001;
     const amp = 1.5 + severity * 4.5;
-    return nodes.map((node, i) => {
+    const out = this.jitterScratch;
+    for (let i = 0; i < nodes.length; i++) {
+      const node = nodes[i];
       const wave = Math.sin(i * 1.7 + now * 42) * amp;
-      return {
-        ...node,
-        x: node.x + Math.cos(node.targetAngle) * wave,
-        y: node.y + Math.sin(node.targetAngle) * wave
-      };
-    });
+      let o = out[i];
+      if (!o) {
+        o = { ...node };
+        out[i] = o;
+      } else {
+        Object.assign(o, node);
+      }
+      o.x = node.x + Math.cos(node.targetAngle) * wave;
+      o.y = node.y + Math.sin(node.targetAngle) * wave;
+    }
+    out.length = nodes.length;
+    return out;
   }
 
   /**
-   * Smooth contour using mid-point quadratic curve chaining through all ring nodes
+   * Smooth contour using mid-point quadratic curve chaining through all ring nodes.
+   * Writes into the reused `contour` buffer; the valid length is `contourLen`.
    */
-  private drawSmoothContour(nodes: SlimeNode[]): void {
+  private buildSmoothContour(nodes: SlimeNode[], steps: number): Phaser.Math.Vector2[] {
     const n = nodes.length;
-    if (n < 3) return;
+    const total = n * steps;
+    const out = this.contour;
+    while (out.length < total) out.push(new Phaser.Math.Vector2());
 
-    const startMidX = (nodes[n - 1].x + nodes[0].x) * 0.5;
-    const startMidY = (nodes[n - 1].y + nodes[0].y) * 0.5;
-
-    this.graphics.beginPath();
-    this.graphics.moveTo(startMidX, startMidY);
-
-    const steps = 4;
+    let k = 0;
     for (let i = 0; i < n; i++) {
       const prev = nodes[(i - 1 + n) % n];
       const curr = nodes[i];
@@ -251,12 +273,14 @@ export class SlimeRenderer {
       for (let s = 1; s <= steps; s++) {
         const t = s / steps;
         const invT = 1 - t;
-        const qx = invT * invT * p0x + 2 * invT * t * p1x + t * t * p2x;
-        const qy = invT * invT * p0y + 2 * invT * t * p1y + t * t * p2y;
-        this.graphics.lineTo(qx, qy);
+        out[k++].set(
+          invT * invT * p0x + 2 * invT * t * p1x + t * t * p2x,
+          invT * invT * p0y + 2 * invT * t * p1y + t * t * p2y
+        );
       }
     }
 
-    this.graphics.closePath();
+    this.contourLen = total;
+    return out;
   }
 }

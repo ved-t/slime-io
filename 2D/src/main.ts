@@ -34,10 +34,16 @@ const config: Phaser.Types.Core.GameConfig = {
     VictoryScene,
     GameOverScene
   ],
+  // Game logic is frame-based (no delta), so cap at 60 to keep speed/cost identical on high-refresh displays.
+  fps: {
+    target: 60,
+    limit: 60
+  },
   render: {
     antialias: true,
     pixelArt: false,
-    roundPixels: false
+    roundPixels: false,
+    powerPreference: 'high-performance'
   }
 };
 

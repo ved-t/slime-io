@@ -51,10 +51,18 @@ export class ArenaScene extends Phaser.Scene {
   private respawnModal?: Phaser.GameObjects.Container;
   private pauseModal?: Phaser.GameObjects.Container;
   private bgGraphics!: Phaser.GameObjects.Graphics;
+  private static readonly BG_TEXTURE_KEY = 'arena_bg_baked';
+
+  // Reused scratch objects so update() doesn't allocate every frame.
+  private readonly pointerWorld = new Phaser.Math.Vector2();
+  private readonly uiOrigin = new Phaser.Math.Vector2();
+  private readonly allSlimes: SlimeOrganism[] = [];
+  private readonly slimeById = new Map<string, SlimeOrganism>();
 
   // Screen-fixed UI root: counter-scaled/positioned every frame so HUD/radar/modals
   // never inherit the world camera's slither-style zoom (see update()).
   private uiRoot!: Phaser.GameObjects.Container;
+  private perfText!: Phaser.GameObjects.Text;
 
   constructor() {
     super({ key: 'ArenaScene' });
@@ -129,6 +137,29 @@ export class ArenaScene extends Phaser.Scene {
       this.ARENA_RADIUS
     );
 
+    // Perf overlay (toggle with ` key): FPS, frame time and entity counts, refreshed at 2 Hz
+    this.perfText = this.add.text(12, 12, '', {
+      fontFamily: 'monospace',
+      fontSize: '12px',
+      color: '#a3e635',
+      backgroundColor: '#000000aa',
+      padding: { x: 6, y: 4 }
+    }).setVisible(false);
+    this.uiRoot.add(this.perfText);
+    this.time.addEvent({
+      delay: 500,
+      loop: true,
+      callback: () => {
+        if (!this.perfText.visible) return;
+        const loop = this.game.loop;
+        this.perfText.setText(
+          `FPS ${loop.actualFps.toFixed(0)}  frame ${loop.delta.toFixed(1)}ms\n` +
+          `slimes ${this.aiDirector.bots.length + (this.playerDead ? 0 : 1)}  ` +
+          `pellets ${this.biomassManager.pellets.length}  trail pts ${this.toxicTrails.trailPoints.length}`
+        );
+      }
+    });
+
     // 8. Input Bindings
     if (this.input.keyboard) {
       this.cursors = this.input.keyboard.createCursorKeys();
@@ -136,6 +167,9 @@ export class ArenaScene extends Phaser.Scene {
       this.keyD = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D);
       this.keySpace = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
 
+      this.input.keyboard.on('keydown-BACKTICK', () => {
+        this.perfText.setVisible(!this.perfText.visible);
+      });
       this.input.keyboard.on('keydown-P', () => this.togglePause());
       this.input.keyboard.on('keydown-ESC', () => this.togglePause());
     }
@@ -175,6 +209,7 @@ export class ArenaScene extends Phaser.Scene {
       this.playerName
     );
     this.player.isControlled = true;
+    this.cameras.main.startFollow(this.player, true, 0.08, 0.08);
 
     // Connect boost pellet drop
     this.player.onDropBoostPellet = (x, y, col) => {
@@ -224,6 +259,14 @@ export class ArenaScene extends Phaser.Scene {
 
     this.bgGraphics.lineStyle(2, 0xffffff, 0.8);
     this.bgGraphics.strokeCircle(this.ARENA_CENTER_X, this.ARENA_CENTER_Y, this.ARENA_RADIUS);
+
+    // Bake the static floor into a texture once — a live Graphics is re-tessellated every frame.
+    if (this.textures.exists(ArenaScene.BG_TEXTURE_KEY)) {
+      this.textures.remove(ArenaScene.BG_TEXTURE_KEY);
+    }
+    this.bgGraphics.generateTexture(ArenaScene.BG_TEXTURE_KEY, this.WORLD_SIZE, this.WORLD_SIZE);
+    this.bgGraphics.destroy();
+    this.add.image(0, 0, ArenaScene.BG_TEXTURE_KEY).setOrigin(0, 0).setDepth(1);
   }
 
   public update(): void {
@@ -231,8 +274,8 @@ export class ArenaScene extends Phaser.Scene {
 
     if (this.playerDead) {
       this.toxicTrails.update();
-      const allSlimes = this.aiDirector.getAllSlimes();
-      this.aiDirector.update(this.biomassManager.pellets, allSlimes);
+      const allSlimes = this.gatherSlimes(false);
+      this.aiDirector.update(this.biomassManager, allSlimes);
       this.biomassManager.update(allSlimes);
       return;
     }
@@ -247,7 +290,7 @@ export class ArenaScene extends Phaser.Scene {
 
     if (this.controlScheme === 'mouse') {
       const pointer = this.input.activePointer;
-      const worldPointer = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
+      const worldPointer = this.cameras.main.getWorldPoint(pointer.x, pointer.y, this.pointerWorld);
       targetX = worldPointer.x;
       targetY = worldPointer.y;
     } else {
@@ -282,8 +325,7 @@ export class ArenaScene extends Phaser.Scene {
       undefined
     );
 
-    // Dynamic Camera Follow & Slither-style Zoom scaling with mass
-    this.cameras.main.startFollow(this.player, true, 0.08, 0.08);
+    // Slither-style Zoom scaling with mass (follow is set once in spawnPlayer)
     const targetZoom = Math.max(0.48, 1.05 - (this.player.radius - 45) * 0.0035);
     const currentZoom = this.cameras.main.zoom;
     this.cameras.main.setZoom(currentZoom + (targetZoom - currentZoom) * 0.05);
@@ -292,11 +334,11 @@ export class ArenaScene extends Phaser.Scene {
     // pixel-fixed on screen regardless of how zoomed in/out the world camera is.
     const zoom = this.cameras.main.zoom;
     this.uiRoot.setScale(1 / zoom);
-    const uiOrigin = this.cameras.main.getWorldPoint(0, 0);
+    const uiOrigin = this.cameras.main.getWorldPoint(0, 0, this.uiOrigin);
     this.uiRoot.setPosition(uiOrigin.x, uiOrigin.y);
 
     // 2. Gather All Active Slimes
-    const allSlimes: SlimeOrganism[] = [this.player, ...this.aiDirector.getAllSlimes()];
+    const allSlimes = this.gatherSlimes(true);
 
     // Hook boost drops for newly spawned bots
     for (const s of allSlimes) {
@@ -314,7 +356,7 @@ export class ArenaScene extends Phaser.Scene {
     this.toxicTrails.update();
 
     // 4. Update AI Bots
-    this.aiDirector.update(this.biomassManager.pellets, allSlimes);
+    this.aiDirector.update(this.biomassManager, allSlimes);
 
     // 5. Update Biomass Pellets & Suction
     this.biomassManager.update(allSlimes, this.upgrades.pheromoneMagnet);
@@ -327,6 +369,17 @@ export class ArenaScene extends Phaser.Scene {
       this.hud.update(this.player, allSlimes);
       this.radar.render(this.player, allSlimes, this.biomassManager.pellets);
     }
+  }
+
+  /** Refills the shared slime array/lookup in place (no per-frame allocation). */
+  private gatherSlimes(includePlayer: boolean): SlimeOrganism[] {
+    const list = this.allSlimes;
+    list.length = 0;
+    this.slimeById.clear();
+    if (includePlayer) list.push(this.player);
+    for (const bot of this.aiDirector.bots) list.push(bot.slime);
+    for (const s of list) this.slimeById.set(s.id, s);
+    return list;
   }
 
   private resolveArenaCombat(allSlimes: SlimeOrganism[]): void {
@@ -351,15 +404,15 @@ export class ArenaScene extends Phaser.Scene {
         s.isCorroding = true;
         s.corrosionPointRadius = exposure.pointRadius;
         s.corrosionPoisonIntensity = exposure.intensity;
-        const killer = allSlimes.find(k => k.id === exposure.killerId);
+        const killer = exposure.killerId ? this.slimeById.get(exposure.killerId) : undefined;
 
         // Sizzle audio feedback
         s.corrosionAudioTimer++;
         if (s.corrosionAudioTimer % 14 === 0) {
           this.audio.playToxicDissolve();
         }
-        // Floating damage number feedback (throttled independently of audio/toast cadence)
-        if (s.corrosionAudioTimer % 6 === 0) {
+        // Floating damage number feedback, player only (throttled independently of audio/toast cadence)
+        if (s.id === this.player.id && s.corrosionAudioTimer % 6 === 0) {
           this.floatingText.spawn(s.x, s.y - s.radius * 0.6, s.lastCorrosionBurn * 6);
         }
 

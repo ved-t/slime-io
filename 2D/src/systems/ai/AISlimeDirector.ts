@@ -3,7 +3,7 @@ import { SlimeOrganism } from '../../entities/slime/SlimeOrganism';
 import { AISlimeBot } from './AISlimeBot';
 import { THEMES } from '../../config/Themes';
 import { INITIAL_UPGRADES } from '../../config/GameConfig';
-import { Pellet } from '../../entities/combat/BiomassPelletManager';
+import { BiomassPelletManager } from '../../entities/combat/BiomassPelletManager';
 
 const BOT_NAMES = [
   'XENO-9', 'GOLIATH', 'CHROMA-VIPER', 'NEBULA-7',
@@ -80,7 +80,7 @@ export class AISlimeDirector {
     this.bots.push(bot);
   }
 
-  public update(pellets: Pellet[], allSlimes: SlimeOrganism[]): void {
+  public update(pellets: BiomassPelletManager, allSlimes: SlimeOrganism[]): void {
     // Process respawn queue
     if (this.bots.length < this.targetBotCount) {
       this.respawnTimer++;
